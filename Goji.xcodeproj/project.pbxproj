@@ -11,11 +11,11 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		A200000000000000000000A2 /* Rubric.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Rubric.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A200000000000000000000A2 /* Goji.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Goji.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		A300000000000000000000A3 /* Rubric */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Rubric; sourceTree = "<group>"; };
+		A300000000000000000000A3 /* Goji */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Goji; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -33,7 +33,7 @@
 		A500000000000000000000A5 = {
 			isa = PBXGroup;
 			children = (
-				A300000000000000000000A3 /* Rubric */,
+				A300000000000000000000A3 /* Goji */,
 				A600000000000000000000A6 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,7 +41,7 @@
 		A600000000000000000000A6 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A200000000000000000000A2 /* Rubric.app */,
+				A200000000000000000000A2 /* Goji.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -49,9 +49,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		A700000000000000000000A7 /* Rubric */ = {
+		A700000000000000000000A7 /* Goji */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = B000000000000000000000B0 /* Build configuration list for PBXNativeTarget "Rubric" */;
+			buildConfigurationList = B000000000000000000000B0 /* Build configuration list for PBXNativeTarget "Goji" */;
 			buildPhases = (
 				A900000000000000000000A9 /* Sources */,
 				A400000000000000000000A4 /* Frameworks */,
@@ -62,14 +62,14 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				A300000000000000000000A3 /* Rubric */,
+				A300000000000000000000A3 /* Goji */,
 			);
-			name = Rubric;
+			name = Goji;
 			packageProductDependencies = (
 				B200000000000000000000B2 /* FluidAudio */,
 			);
-			productName = Rubric;
-			productReference = A200000000000000000000A2 /* Rubric.app */;
+			productName = Goji;
+			productReference = A200000000000000000000A2 /* Goji.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -87,7 +87,7 @@
 					};
 				};
 			};
-			buildConfigurationList = AF00000000000000000000AF /* Build configuration list for PBXProject "Rubric" */;
+			buildConfigurationList = AF00000000000000000000AF /* Build configuration list for PBXProject "Goji" */;
 			compatibilityVersion = "Xcode 15.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -103,7 +103,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				A700000000000000000000A7 /* Rubric */,
+				A700000000000000000000A7 /* Goji */,
 			);
 		};
 /* End PBXProject section */
@@ -174,20 +174,20 @@
 		AD00000000000000000000AD /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = Rubric/Rubric.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Goji/Goji.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Rubric listens while you hold the dictation key and transcribes entirely on this Mac. Audio never leaves your computer.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Goji listens while you hold the dictation key and transcribes entirely on this Mac. Audio never leaves your computer.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.brendanrong.Rubric;
+				PRODUCT_BUNDLE_IDENTIFIER = com.brendanrong.Goji;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 			};
@@ -196,20 +196,20 @@
 		AE00000000000000000000AE /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = Rubric/Rubric.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Goji/Goji.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Rubric listens while you hold the dictation key and transcribes entirely on this Mac. Audio never leaves your computer.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Goji listens while you hold the dictation key and transcribes entirely on this Mac. Audio never leaves your computer.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.brendanrong.Rubric;
+				PRODUCT_BUNDLE_IDENTIFIER = com.brendanrong.Goji;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 			};
@@ -218,7 +218,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		AF00000000000000000000AF /* Build configuration list for PBXProject "Rubric" */ = {
+		AF00000000000000000000AF /* Build configuration list for PBXProject "Goji" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				AB00000000000000000000AB /* Debug */,
@@ -227,7 +227,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		B000000000000000000000B0 /* Build configuration list for PBXNativeTarget "Rubric" */ = {
+		B000000000000000000000B0 /* Build configuration list for PBXNativeTarget "Goji" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				AD00000000000000000000AD /* Debug */,

@@ -19,7 +19,7 @@ final class AudioRecorder {
         let inputFormat = input.outputFormat(forBus: 0)
 
         guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0 else {
-            throw RubricError("No microphone input available. Check mic permission in System Settings > Privacy & Security > Microphone.")
+            throw GojiError("No microphone input available. Check mic permission in System Settings > Privacy & Security > Microphone.")
         }
         guard let outputFormat = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
@@ -27,7 +27,7 @@ final class AudioRecorder {
             channels: 1,
             interleaved: false
         ) else {
-            throw RubricError("Could not create 16 kHz audio format.")
+            throw GojiError("Could not create 16 kHz audio format.")
         }
 
         converter = AVAudioConverter(from: inputFormat, to: outputFormat)
@@ -79,7 +79,7 @@ final class AudioRecorder {
     }
 }
 
-struct RubricError: LocalizedError {
+struct GojiError: LocalizedError {
     let message: String
     init(_ message: String) { self.message = message }
     var errorDescription: String? { message }
