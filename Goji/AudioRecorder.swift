@@ -1,21 +1,41 @@
 import AVFoundation
+import CoreAudio
 
 /// Captures microphone audio and accumulates 16 kHz mono Float32 samples,
 /// the format Parakeet expects. Start on key press, stop on release.
 final class AudioRecorder {
     static let sampleRate: Double = 16_000
 
+    /// Mic level callback (0...1), delivered on the main queue while recording.
+    var onLevel: ((Float) -> Void)?
+
     private let engine = AVAudioEngine()
     private let lock = NSLock()
     private var samples: [Float] = []
     private var converter: AVAudioConverter?
 
-    func start() throws {
+    func start(deviceUID: String? = nil) throws {
         lock.lock()
         samples.removeAll()
         lock.unlock()
 
         let input = engine.inputNode
+
+        // Route to the chosen mic; silently fall back to the system default.
+        if let deviceUID,
+           let deviceID = MicDevices.deviceID(forUID: deviceUID),
+           let unit = input.audioUnit {
+            var device = deviceID
+            AudioUnitSetProperty(
+                unit,
+                kAudioOutputUnitProperty_CurrentDevice,
+                kAudioUnitScope_Global,
+                0,
+                &device,
+                UInt32(MemoryLayout<AudioDeviceID>.size)
+            )
+        }
+
         let inputFormat = input.outputFormat(forBus: 0)
 
         guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0 else {
@@ -76,6 +96,17 @@ final class AudioRecorder {
         lock.lock()
         samples.append(contentsOf: chunk)
         lock.unlock()
+
+        // Level meter for the HUD waveform.
+        var sum: Float = 0
+        for sample in chunk {
+            sum += sample * sample
+        }
+        let rms = (sum / Float(max(chunk.count, 1))).squareRoot()
+        let level = min(1, rms * 9)
+        DispatchQueue.main.async { [weak self] in
+            self?.onLevel?(level)
+        }
     }
 }
 

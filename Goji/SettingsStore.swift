@@ -88,6 +88,18 @@ final class SettingsStore: ObservableObject {
     @Published var launchAtLogin: Bool {
         didSet { applyLaunchAtLogin() }
     }
+    @Published var showInMenuBar: Bool {
+        didSet { defaults.set(showInMenuBar, forKey: Keys.showInMenuBar) }
+    }
+    @Published var micDeviceUID: String? {
+        didSet {
+            if let micDeviceUID {
+                defaults.set(micDeviceUID, forKey: Keys.micDeviceUID)
+            } else {
+                defaults.removeObject(forKey: Keys.micDeviceUID)
+            }
+        }
+    }
     @Published var replacements: [ReplacementRule] {
         didSet { persistReplacements() }
     }
@@ -100,6 +112,8 @@ final class SettingsStore: ObservableObject {
         static let activationMode = "activationMode"
         static let hudStyle = "hudStyle"
         static let replacements = "replacements"
+        static let showInMenuBar = "showInMenuBar"
+        static let micDeviceUID = "micDeviceUID"
     }
 
     private init() {
@@ -108,6 +122,8 @@ final class SettingsStore: ObservableObject {
         activationMode = ActivationMode(rawValue: d.string(forKey: Keys.activationMode) ?? "") ?? .hold
         hudStyle = HUDStyle(rawValue: d.string(forKey: Keys.hudStyle) ?? "") ?? .panel
         launchAtLogin = SMAppService.mainApp.status == .enabled
+        showInMenuBar = (d.object(forKey: Keys.showInMenuBar) as? Bool) ?? true
+        micDeviceUID = d.string(forKey: Keys.micDeviceUID)
         if let data = d.data(forKey: Keys.replacements),
            let rules = try? JSONDecoder().decode([ReplacementRule].self, from: data) {
             replacements = rules

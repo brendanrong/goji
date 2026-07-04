@@ -3,9 +3,10 @@ import SwiftUI
 @main
 struct GojiApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
+    @ObservedObject private var settings = SettingsStore.shared
 
     var body: some Scene {
-        MenuBarExtra {
+        MenuBarExtra(isInserted: $settings.showInMenuBar) {
             MenuContent(state: delegate.state, controller: delegate.controller)
         } label: {
             MenuBarLabel(state: delegate.state)
@@ -24,6 +25,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         controller.start()
+    }
+
+    /// Escape hatch: relaunching Goji from Spotlight/Finder restores a hidden menu bar icon.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        SettingsStore.shared.showInMenuBar = true
+        return true
     }
 }
 

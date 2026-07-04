@@ -28,6 +28,10 @@ final class DictationController {
         hotkey.onEscape = { [weak self] in self?.cancelRecording() }
         hotkey.start()
 
+        recorder.onLevel = { [weak self] level in
+            self?.hud.updateLevel(level)
+        }
+
         loadModels()
     }
 
@@ -77,7 +81,7 @@ final class DictationController {
     private func beginRecording() {
         guard state.phase == .idle, state.modelState == .ready else { return }
         do {
-            try recorder.start()
+            try recorder.start(deviceUID: settings.micDeviceUID)
             state.phase = .recording
             hud.show(.listening, style: settings.hudStyle)
         } catch {
