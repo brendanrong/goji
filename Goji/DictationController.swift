@@ -4,6 +4,8 @@ import AppKit
 @MainActor
 final class DictationController {
     private let state: AppState
+    private let settings = SettingsStore.shared
+    private let history = HistoryStore.shared
     private let hotkey = HotkeyMonitor()
     private let recorder = AudioRecorder()
     private let transcriber = Transcriber()
@@ -21,9 +23,9 @@ final class DictationController {
         Permissions.requestMicrophone()
         refreshAccessibility(prompt: true)
 
-        hotkey.onPress = { [weak self] in self?.beginRecording() }
-        hotkey.onRelease = { [weak self] in self?.finishRecording() }
-        hotkey.onCancel = { [weak self] in self?.cancelRecording() }
+        hotkey.onHotkeyDown = { [weak self] in self?.hotkeyDown() }
+        hotkey.onHotkeyUp = { [weak self] in self?.hotkeyUp() }
+        hotkey.onEscape = { [weak self] in self?.cancelRecording() }
         hotkey.start()
 
         loadModels()
@@ -48,12 +50,36 @@ final class DictationController {
         state.accessibilityGranted = Permissions.accessibilityGranted
     }
 
+    /// Re-inserts the most recent transcript at the cursor.
+    func insertLast() {
+        guard let last = history.last else { return }
+        inserter.insert(last.text + " ")
+    }
+
+    private func hotkeyDown() {
+        switch settings.activationMode {
+        case .hold:
+            beginRecording()
+        case .toggle:
+            if state.phase == .recording {
+                finishRecording()
+            } else {
+                beginRecording()
+            }
+        }
+    }
+
+    private func hotkeyUp() {
+        guard settings.activationMode == .hold else { return }
+        finishRecording()
+    }
+
     private func beginRecording() {
         guard state.phase == .idle, state.modelState == .ready else { return }
         do {
             try recorder.start()
             state.phase = .recording
-            hud.show(.listening)
+            hud.show(.listening, style: settings.hudStyle)
         } catch {
             state.lastError = "Mic failed: \(error.localizedDescription)"
         }
@@ -70,7 +96,7 @@ final class DictationController {
         }
 
         state.phase = .transcribing
-        hud.show(.transcribing)
+        hud.show(.transcribing, style: settings.hudStyle)
 
         Task {
             defer {
@@ -79,12 +105,15 @@ final class DictationController {
             }
             do {
                 let text = try await transcriber.transcribe(samples)
-                let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !trimmed.isEmpty else { return }
+                let cleaned = settings.applyReplacements(
+                    to: text.trimmingCharacters(in: .whitespacesAndNewlines)
+                )
+                guard !cleaned.isEmpty else { return }
 
-                state.lastTranscript = trimmed
+                state.lastTranscript = cleaned
+                history.add(cleaned)
                 refreshAccessibility()
-                inserter.insert(trimmed + " ")
+                inserter.insert(cleaned + " ")
             } catch {
                 state.lastError = "Transcription failed: \(error.localizedDescription)"
             }
