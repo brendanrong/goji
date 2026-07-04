@@ -67,7 +67,8 @@ final class HUDController {
             newPanel.level = .statusBar
             newPanel.contentView = NSHostingView(rootView: PanelHUDView(model: model))
         case .notch(let notch):
-            newPanel = makePanel(size: NSSize(width: notch.width + 280, height: notch.height + 12))
+            // Barely wider than the notch itself: Willow-style, never covers menu bar items.
+            newPanel = makePanel(size: NSSize(width: notch.width + 190, height: notch.height + 14))
             newPanel.level = .screenSaver
             newPanel.contentView = NSHostingView(rootView: NotchHUDView(model: model, notchWidth: notch.width))
         }

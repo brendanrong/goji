@@ -59,30 +59,66 @@ struct PanelHUDView: View {
     }
 }
 
-/// Willow-style notch wrap: a black shape that hugs the physical notch, with the
-/// app icon in the left wing and a live waveform + amber mic pill in the right wing.
-/// Slides down from behind the notch with a spring.
+/// The classic notch-extension outline: flared top corners that blend into the
+/// menu bar's black, rounded bottom corners. Reads as "the notch grew".
+struct NotchShape: Shape {
+    var topRadius: CGFloat = 10
+    var bottomRadius: CGFloat = 14
+
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        p.addQuadCurve(
+            to: CGPoint(x: rect.minX + topRadius, y: rect.minY + topRadius),
+            control: CGPoint(x: rect.minX + topRadius, y: rect.minY)
+        )
+        p.addLine(to: CGPoint(x: rect.minX + topRadius, y: rect.maxY - bottomRadius))
+        p.addQuadCurve(
+            to: CGPoint(x: rect.minX + topRadius + bottomRadius, y: rect.maxY),
+            control: CGPoint(x: rect.minX + topRadius, y: rect.maxY)
+        )
+        p.addLine(to: CGPoint(x: rect.maxX - topRadius - bottomRadius, y: rect.maxY))
+        p.addQuadCurve(
+            to: CGPoint(x: rect.maxX - topRadius, y: rect.maxY - bottomRadius),
+            control: CGPoint(x: rect.maxX - topRadius, y: rect.maxY)
+        )
+        p.addLine(to: CGPoint(x: rect.maxX - topRadius, y: rect.minY + topRadius))
+        p.addQuadCurve(
+            to: CGPoint(x: rect.maxX, y: rect.minY),
+            control: CGPoint(x: rect.maxX - topRadius, y: rect.minY)
+        )
+        p.closeSubpath()
+        return p
+    }
+}
+
+/// Willow-style notch companion: a compact blob barely wider than the notch,
+/// app icon in the left wing, waveform + amber mic pill in the right wing.
+/// Grows out of the notch itself.
 struct NotchHUDView: View {
     @ObservedObject var model: HUDModel
     var notchWidth: CGFloat
 
     var body: some View {
         GeometryReader { geo in
-            let wing = max((geo.size.width - notchWidth) / 2, 0)
-            ZStack(alignment: .top) {
-                UnevenRoundedRectangle(bottomLeadingRadius: 18, bottomTrailingRadius: 18, style: .continuous)
+            let inset: CGFloat = 20  // top flare + breathing room
+            let wing = max((geo.size.width - notchWidth) / 2 - inset, 0)
+            ZStack {
+                NotchShape()
                     .fill(.black)
 
                 HStack(spacing: 0) {
-                    // Left wing: mini app icon, Willow-style.
+                    // Left wing: mini app icon.
                     HStack {
+                        Spacer(minLength: 0)
                         if let icon = NSApp.applicationIconImage {
                             Image(nsImage: icon)
                                 .resizable()
                                 .scaledToFit()
-                                .frame(width: 22, height: 22)
-                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                                .frame(width: 19, height: 19)
+                                .clipShape(RoundedRectangle(cornerRadius: 5))
                         }
+                        Spacer(minLength: 0)
                     }
                     .frame(width: wing)
 
@@ -91,15 +127,15 @@ struct NotchHUDView: View {
                         .frame(width: notchWidth)
 
                     // Right wing: live waveform + state pill.
-                    HStack(spacing: 8) {
+                    HStack(spacing: 6) {
                         if model.mode == .listening {
-                            WaveformBars(level: model.level, color: .white, barCount: 8, barWidth: 2.5, maxHeight: 12)
+                            WaveformBars(level: model.level, color: .white, barCount: 6, barWidth: 2.5, maxHeight: 11)
                             Capsule()
                                 .fill(Color(red: 0.96, green: 0.63, blue: 0.24))
-                                .frame(width: 36, height: 21)
+                                .frame(width: 30, height: 18)
                                 .overlay(
                                     Image(systemName: "mic.fill")
-                                        .font(.system(size: 11, weight: .semibold))
+                                        .font(.system(size: 10, weight: .semibold))
                                         .foregroundStyle(.black.opacity(0.72))
                                 )
                         } else {
@@ -109,10 +145,13 @@ struct NotchHUDView: View {
                     }
                     .frame(width: wing)
                 }
-                .frame(height: max(geo.size.height - 8, 0))
+                .padding(.horizontal, inset)
+                .frame(height: max(geo.size.height - 10, 0), alignment: .center)
+                .frame(maxHeight: .infinity, alignment: .top)
             }
-            .offset(y: model.visible ? 0 : -geo.size.height)
-            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: model.visible)
+            .scaleEffect(model.visible ? 1 : 0.35, anchor: .top)
+            .opacity(model.visible ? 1 : 0)
+            .animation(.spring(response: 0.32, dampingFraction: 0.78), value: model.visible)
         }
         .environment(\.colorScheme, .dark)
     }
