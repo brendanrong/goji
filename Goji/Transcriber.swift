@@ -18,7 +18,7 @@ actor Transcriber {
         guard let manager else {
             throw GojiError("Model isn't loaded yet.")
         }
-        let result = try await manager.transcribe(samples)
+        let result = try await manager.transcribe(samples, source: .microphone)
         return result.text
     }
 }
