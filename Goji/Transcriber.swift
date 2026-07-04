@@ -16,7 +16,7 @@ actor Transcriber {
     /// Expects 16 kHz mono Float32 samples.
     func transcribe(_ samples: [Float]) async throws -> String {
         guard let manager else {
-            throw RubricError("Model isn't loaded yet.")
+            throw GojiError("Model isn't loaded yet.")
         }
         let result = try await manager.transcribe(samples)
         return result.text

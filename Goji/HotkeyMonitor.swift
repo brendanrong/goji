@@ -2,7 +2,7 @@ import AppKit
 
 /// Global hold-to-talk hotkey: Right Option (keyCode 61). Esc cancels an active recording.
 /// Global NSEvent monitors only deliver events once Accessibility is granted,
-/// which Rubric needs anyway to paste.
+/// which Goji needs anyway to paste.
 @MainActor
 final class HotkeyMonitor {
     var onPress: (() -> Void)?
@@ -25,7 +25,7 @@ final class HotkeyMonitor {
             monitors.append(global)
         }
 
-        // Local monitor so the hotkey also works while a Rubric window/menu has focus.
+        // Local monitor so the hotkey also works while a Goji window/menu has focus.
         if let local = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged, handler: { [weak self] event in
             self?.handleFlags(event)
             return event

@@ -37,7 +37,7 @@ struct MenuContent: View {
 
             Divider()
 
-            Button("Quit Rubric") {
+            Button("Quit Goji") {
                 NSApp.terminate(nil)
             }
             .keyboardShortcut("q")

@@ -1,4 +1,4 @@
-# Rubric PRD
+# Goji PRD
 
 Local dictation for macOS. Hold a key, talk, release. Words appear where your cursor is. Nothing leaves the Mac.
 
@@ -16,7 +16,7 @@ Local dictation for macOS. Hold a key, talk, release. Words appear where your cu
 - Handy (handy.computer): push-to-talk vs toggle modes, configurable binding. Simple settings done right.
 - OpenWhispr: personal dictionary that learns from corrections, voice commands ("clean this up"), model picker.
 
-Rubric's edge: native Swift on the ANE. No Electron, tiny memory footprint, instant cold start, Apache-2.0 dependencies only.
+Goji's edge: native Swift on the ANE. No Electron, tiny memory footprint, instant cold start, Apache-2.0 dependencies only.
 
 ## v1 scope
 
