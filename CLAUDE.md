@@ -25,6 +25,7 @@ Read PRD.md for scope. v1 is the core loop plus a lean settings window. Don't go
 - `SettingsStore.swift`: user prefs (hotkey, hold/toggle, HUD style, login item, replacements). UserDefaults-backed, applied live, no restart needed.
 - `SettingsView.swift`: single-pane grouped Settings window (Cmd+,).
 - `HistoryStore.swift`: recent transcripts, capped at 50, local UserDefaults only.
+- `MicDevices.swift`: CoreAudio input-device listing + UID resolution for the mic picker.
 - `Permissions.swift`: mic + Accessibility helpers.
 - `MenuContent.swift`: the status bar menu (paste last, settings, permissions, quit).
 

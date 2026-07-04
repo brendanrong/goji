@@ -28,10 +28,20 @@ final class HUDController {
             rebuild(for: placement)
         }
         panel?.orderFrontRegardless()
+        model.visible = true
     }
 
     func hide() {
-        panel?.orderOut(nil)
+        model.visible = false
+        // Let the exit animation play before the panel disappears.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+            guard let self, !self.model.visible else { return }
+            self.panel?.orderOut(nil)
+        }
+    }
+
+    func updateLevel(_ level: Float) {
+        model.level = model.level * 0.55 + level * 0.45
     }
 
     private func placement(for style: HUDStyle) -> Placement {

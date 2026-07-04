@@ -5,6 +5,7 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject private var settings = SettingsStore.shared
     @ObservedObject private var history = HistoryStore.shared
+    @State private var devices: [MicDevices.Device] = []
 
     var body: some View {
         Form {
@@ -21,7 +22,28 @@ struct SettingsView: View {
                 }
                 .pickerStyle(.segmented)
                 Toggle("Launch at login", isOn: $settings.launchAtLogin)
+                Toggle("Show in menu bar", isOn: $settings.showInMenuBar)
+                if !settings.showInMenuBar {
+                    Text("Icon hidden. Launch Goji again from Spotlight or Finder to bring it back.")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
                 Text(modeHint)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Microphone") {
+                Picker("Input device", selection: $settings.micDeviceUID) {
+                    Text("System default").tag(String?.none)
+                    ForEach(devices) { device in
+                        Text(device.name).tag(String?.some(device.uid))
+                    }
+                    if let saved = settings.micDeviceUID, !devices.contains(where: { $0.uid == saved }) {
+                        Text("Saved device (unavailable)").tag(String?.some(saved))
+                    }
+                }
+                Text("Used from the next recording. Falls back to the system default if unavailable.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -92,7 +114,8 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 480, height: 640)
+        .frame(width: 480, height: 680)
+        .onAppear { devices = MicDevices.inputDevices() }
     }
 
     private var modeHint: String {
