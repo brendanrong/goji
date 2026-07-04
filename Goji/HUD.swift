@@ -67,9 +67,9 @@ final class HUDController {
             newPanel.level = .statusBar
             newPanel.contentView = NSHostingView(rootView: PanelHUDView(model: model))
         case .notch(let notch):
-            newPanel = makePanel(size: NSSize(width: notch.width + 120, height: notch.height + 30))
+            newPanel = makePanel(size: NSSize(width: notch.width + 280, height: notch.height + 12))
             newPanel.level = .screenSaver
-            newPanel.contentView = NSHostingView(rootView: NotchHUDView(model: model))
+            newPanel.contentView = NSHostingView(rootView: NotchHUDView(model: model, notchWidth: notch.width))
         }
 
         position(newPanel, placement: placement)

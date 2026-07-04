@@ -84,6 +84,9 @@ final class DictationController {
             try recorder.start(deviceUID: settings.micDeviceUID)
             state.phase = .recording
             hud.show(.listening, style: settings.hudStyle)
+            if settings.playSounds {
+                Sounds.recordingStarted()
+            }
         } catch {
             state.lastError = "Mic failed: \(error.localizedDescription)"
         }
@@ -101,6 +104,9 @@ final class DictationController {
 
         state.phase = .transcribing
         hud.show(.transcribing, style: settings.hudStyle)
+        if settings.playSounds {
+            Sounds.recordingStopped()
+        }
 
         Task {
             defer {
@@ -109,9 +115,13 @@ final class DictationController {
             }
             do {
                 let text = try await transcriber.transcribe(samples)
-                let cleaned = settings.applyReplacements(
-                    to: text.trimmingCharacters(in: .whitespacesAndNewlines)
-                )
+                var cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !cleaned.isEmpty else { return }
+
+                if settings.cleanupEnabled {
+                    cleaned = await Cleaner.cleanup(cleaned)
+                }
+                cleaned = settings.applyReplacements(to: cleaned)
                 guard !cleaned.isEmpty else { return }
 
                 state.lastTranscript = cleaned

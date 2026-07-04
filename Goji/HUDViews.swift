@@ -59,34 +59,58 @@ struct PanelHUDView: View {
     }
 }
 
-/// Black extension that slides out from under the physical notch.
+/// Willow-style notch wrap: a black shape that hugs the physical notch, with the
+/// app icon in the left wing and a live waveform + amber mic pill in the right wing.
+/// Slides down from behind the notch with a spring.
 struct NotchHUDView: View {
     @ObservedObject var model: HUDModel
+    var notchWidth: CGFloat
 
     var body: some View {
         GeometryReader { geo in
-            VStack(spacing: 0) {
-                Spacer(minLength: 0)
-                Group {
-                    if model.mode == .listening {
-                        WaveformBars(level: model.level, color: .white, barCount: 21, barWidth: 3, maxHeight: 15)
-                    } else {
-                        HStack(spacing: 7) {
-                            ProgressView()
-                                .controlSize(.small)
-                            Text("Transcribing…")
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.9))
+            let wing = max((geo.size.width - notchWidth) / 2, 0)
+            ZStack(alignment: .top) {
+                UnevenRoundedRectangle(bottomLeadingRadius: 18, bottomTrailingRadius: 18, style: .continuous)
+                    .fill(.black)
+
+                HStack(spacing: 0) {
+                    // Left wing: mini app icon, Willow-style.
+                    HStack {
+                        if let icon = NSApp.applicationIconImage {
+                            Image(nsImage: icon)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 22, height: 22)
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
                         }
                     }
+                    .frame(width: wing)
+
+                    // The physical notch: leave it empty.
+                    Spacer()
+                        .frame(width: notchWidth)
+
+                    // Right wing: live waveform + state pill.
+                    HStack(spacing: 8) {
+                        if model.mode == .listening {
+                            WaveformBars(level: model.level, color: .white, barCount: 8, barWidth: 2.5, maxHeight: 12)
+                            Capsule()
+                                .fill(Color(red: 0.96, green: 0.63, blue: 0.24))
+                                .frame(width: 36, height: 21)
+                                .overlay(
+                                    Image(systemName: "mic.fill")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(.black.opacity(0.72))
+                                )
+                        } else {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                    }
+                    .frame(width: wing)
                 }
-                .padding(.bottom, 8)
+                .frame(height: max(geo.size.height - 8, 0))
             }
-            .frame(width: geo.size.width, height: geo.size.height)
-            .background(
-                UnevenRoundedRectangle(bottomLeadingRadius: 16, bottomTrailingRadius: 16, style: .continuous)
-                    .fill(.black)
-            )
             .offset(y: model.visible ? 0 : -geo.size.height)
             .animation(.spring(response: 0.35, dampingFraction: 0.8), value: model.visible)
         }

@@ -91,6 +91,12 @@ final class SettingsStore: ObservableObject {
     @Published var showInMenuBar: Bool {
         didSet { defaults.set(showInMenuBar, forKey: Keys.showInMenuBar) }
     }
+    @Published var playSounds: Bool {
+        didSet { defaults.set(playSounds, forKey: Keys.playSounds) }
+    }
+    @Published var cleanupEnabled: Bool {
+        didSet { defaults.set(cleanupEnabled, forKey: Keys.cleanupEnabled) }
+    }
     @Published var micDeviceUID: String? {
         didSet {
             if let micDeviceUID {
@@ -114,6 +120,8 @@ final class SettingsStore: ObservableObject {
         static let replacements = "replacements"
         static let showInMenuBar = "showInMenuBar"
         static let micDeviceUID = "micDeviceUID"
+        static let playSounds = "playSounds"
+        static let cleanupEnabled = "cleanupEnabled"
     }
 
     private init() {
@@ -124,6 +132,8 @@ final class SettingsStore: ObservableObject {
         launchAtLogin = SMAppService.mainApp.status == .enabled
         showInMenuBar = (d.object(forKey: Keys.showInMenuBar) as? Bool) ?? true
         micDeviceUID = d.string(forKey: Keys.micDeviceUID)
+        playSounds = (d.object(forKey: Keys.playSounds) as? Bool) ?? true
+        cleanupEnabled = d.bool(forKey: Keys.cleanupEnabled)
         if let data = d.data(forKey: Keys.replacements),
            let rules = try? JSONDecoder().decode([ReplacementRule].self, from: data) {
             replacements = rules
