@@ -31,7 +31,8 @@ Read PRD.md for scope. v1 is the core loop plus a lean settings window. Don't go
 ## Gotchas
 
 - `project.pbxproj` is hand-written (objectVersion 70, synchronized folder). New `.swift` files dropped into `Goji/` are picked up automatically. Never add per-file PBX entries.
-- FluidAudio is pinned `from: 0.12.4`. If `AsrManager`/`AsrModels` APIs drift on a version bump, check their README before fighting the compiler.
+- FluidAudio resolves to 0.15.x (pbxproj says `from: 0.12.4`, upToNextMajor). Their README and docs lag the real API. The exact source Xcode compiles against is snapshotted in `.fluidaudio-src/` (gitignored): grep THAT, not the docs, before touching any FluidAudio call. Refresh the snapshot from `~/Library/Developer/Xcode/DerivedData/Goji-*/SourcePackages/checkouts/FluidAudio/Sources/FluidAudio` after any version bump.
+- `AsrManager.transcribe` requires `decoderState: inout TdtDecoderState` (fresh one per utterance). The simpler-looking `UnifiedAsrManager` is a DIFFERENT model (Parakeet Unified, not multilingual v3), don't switch to it casually.
 - Accessibility permission is tied to the code signature. After changing signing identity: `tccutil reset Accessibility com.brendanrong.Goji`, then re-grant.
 - Sandbox is OFF on purpose (synthetic keystrokes need it off). Hardened runtime is ON with the audio-input entitlement, so notarization works later.
 - git from the Cowork sandbox: prefix read commands with `GIT_OPTIONAL_LOCKS=0`.
