@@ -91,6 +91,12 @@ final class SettingsStore: ObservableObject {
     @Published var showInMenuBar: Bool {
         didSet { defaults.set(showInMenuBar, forKey: Keys.showInMenuBar) }
     }
+    @Published var showInDock: Bool {
+        didSet {
+            defaults.set(showInDock, forKey: Keys.showInDock)
+            applyDockPolicy()
+        }
+    }
     @Published var playSounds: Bool {
         didSet { defaults.set(playSounds, forKey: Keys.playSounds) }
     }
@@ -119,6 +125,7 @@ final class SettingsStore: ObservableObject {
         static let hudStyle = "hudStyle"
         static let replacements = "replacements"
         static let showInMenuBar = "showInMenuBar"
+        static let showInDock = "showInDock"
         static let micDeviceUID = "micDeviceUID"
         static let playSounds = "playSounds"
         static let cleanupEnabled = "cleanupEnabled"
@@ -131,6 +138,7 @@ final class SettingsStore: ObservableObject {
         hudStyle = HUDStyle(rawValue: d.string(forKey: Keys.hudStyle) ?? "") ?? .panel
         launchAtLogin = SMAppService.mainApp.status == .enabled
         showInMenuBar = (d.object(forKey: Keys.showInMenuBar) as? Bool) ?? true
+        showInDock = (d.object(forKey: Keys.showInDock) as? Bool) ?? true
         micDeviceUID = d.string(forKey: Keys.micDeviceUID)
         playSounds = (d.object(forKey: Keys.playSounds) as? Bool) ?? true
         cleanupEnabled = d.bool(forKey: Keys.cleanupEnabled)
@@ -160,6 +168,12 @@ final class SettingsStore: ObservableObject {
             )
         }
         return result
+    }
+
+    /// LSUIElement keeps the app out of the Dock at process start;
+    /// this flips it at runtime based on the user's preference.
+    func applyDockPolicy() {
+        NSApp.setActivationPolicy(showInDock ? .regular : .accessory)
     }
 
     private func applyLaunchAtLogin() {
