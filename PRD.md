@@ -30,14 +30,18 @@ In:
 - Settings window (Cmd+,): shortcut, mode, launch at login, HUD style, replacements, history
 - Word replacements: case-insensitive whole-word find/replace applied after transcription
 - Transcript history: last 50, stored locally only, Paste Last Transcription in the menu
-- First run: mic prompt, Accessibility prompt, one-time ~600 MB model download
+- Start/stop sound cues (toggleable)
+- Optional AI cleanup: Apple Foundation Models on-device (macOS 26 + Apple Intelligence), off by default
+- Mic input picker with live Test Mic meter
+- Willow-style notch HUD: app icon wing, live waveform, amber mic pill, spring slide-down
+- make-dmg.sh: Release build + DMG, optional bundled model (BUNDLE_MODEL=1), optional notarization (NOTARIZE=1)
+- First run: mic prompt, Accessibility prompt, one-time ~600 MB model download (skipped when the model is bundled)
 
 Out (v2+ backlog, roughly in order):
 
-1. AI cleanup pass using Apple Foundation Models (on-device, zero extra install on macOS 26)
-2. Auto-learned corrections (OpenWhispr-style), building on word replacements
-3. Streaming partial transcript in the HUD (FluidAudio SlidingWindowAsrManager)
-4. In-app updates
+1. Auto-learned corrections (OpenWhispr-style), building on word replacements
+2. Streaming partial transcript in the HUD (FluidAudio SlidingWindowAsrManager)
+3. In-app updates
 
 ## Decisions
 
