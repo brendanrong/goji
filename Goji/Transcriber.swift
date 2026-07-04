@@ -18,7 +18,9 @@ actor Transcriber {
         guard let manager else {
             throw GojiError("Model isn't loaded yet.")
         }
-        let result = try await manager.transcribe(samples, source: .microphone)
+        // Fresh decoder state per utterance; every hotkey press is an independent dictation.
+        var decoderState = try TdtDecoderState()
+        let result = try await manager.transcribe(samples, decoderState: &decoderState)
         return result.text
     }
 }
