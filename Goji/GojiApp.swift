@@ -10,6 +10,10 @@ struct GojiApp: App {
         } label: {
             MenuBarLabel(state: delegate.state)
         }
+
+        Settings {
+            SettingsView()
+        }
     }
 }
 

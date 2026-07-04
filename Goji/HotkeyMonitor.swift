@@ -1,20 +1,20 @@
 import AppKit
 
-/// Global hold-to-talk hotkey: Right Option (keyCode 61). Esc cancels an active recording.
+/// Global monitors for the dictation key (a single modifier, read live from
+/// SettingsStore) and Esc. Emits raw down/up transitions; DictationController
+/// decides what they mean based on Hold vs Toggle mode.
 /// Global NSEvent monitors only deliver events once Accessibility is granted,
 /// which Goji needs anyway to paste.
 @MainActor
 final class HotkeyMonitor {
-    var onPress: (() -> Void)?
-    var onRelease: (() -> Void)?
-    var onCancel: (() -> Void)?
-
-    private(set) var isHeld = false
-
-    private let hotkeyCode: UInt16 = 61  // Right Option
-    private let escapeCode: UInt16 = 53
+    var onHotkeyDown: (() -> Void)?
+    var onHotkeyUp: (() -> Void)?
+    var onEscape: (() -> Void)?
 
     private var monitors: [Any] = []
+    private var keyIsDown = false
+    private var downKeyCode: UInt16?
+    private let escapeCode: UInt16 = 53
 
     func start() {
         guard monitors.isEmpty else { return }
@@ -25,7 +25,7 @@ final class HotkeyMonitor {
             monitors.append(global)
         }
 
-        // Local monitor so the hotkey also works while a Goji window/menu has focus.
+        // Local monitor so the hotkey also works while a Goji window has focus.
         if let local = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged, handler: { [weak self] event in
             self?.handleFlags(event)
             return event
@@ -34,9 +34,8 @@ final class HotkeyMonitor {
         }
 
         if let escape = NSEvent.addGlobalMonitorForEvents(matching: .keyDown, handler: { [weak self] event in
-            guard let self, self.isHeld, event.keyCode == self.escapeCode else { return }
-            self.isHeld = false
-            self.onCancel?()
+            guard let self, event.keyCode == self.escapeCode else { return }
+            self.onEscape?()
         }) {
             monitors.append(escape)
         }
@@ -45,19 +44,32 @@ final class HotkeyMonitor {
     func stop() {
         monitors.forEach { NSEvent.removeMonitor($0) }
         monitors.removeAll()
-        isHeld = false
+        keyIsDown = false
+        downKeyCode = nil
     }
 
     private func handleFlags(_ event: NSEvent) {
-        guard event.keyCode == hotkeyCode else { return }
-        let pressed = event.modifierFlags.contains(.option)
+        let key = SettingsStore.shared.hotkeyKey
 
-        if pressed && !isHeld {
-            isHeld = true
-            onPress?()
-        } else if !pressed && isHeld {
-            isHeld = false
-            onRelease?()
+        // If the configured key changed while the old one was down, treat it as released.
+        if keyIsDown, let down = downKeyCode, down != key.keyCode {
+            keyIsDown = false
+            downKeyCode = nil
+            onHotkeyUp?()
+            return
+        }
+
+        guard event.keyCode == key.keyCode else { return }
+        let pressed = event.modifierFlags.contains(key.flag)
+
+        if pressed && !keyIsDown {
+            keyIsDown = true
+            downKeyCode = key.keyCode
+            onHotkeyDown?()
+        } else if !pressed && keyIsDown {
+            keyIsDown = false
+            downKeyCode = nil
+            onHotkeyUp?()
         }
     }
 }

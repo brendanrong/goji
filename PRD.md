@@ -23,20 +23,21 @@ Goji's edge: native Swift on the ANE. No Electron, tiny memory footprint, instan
 In:
 
 - Menu bar app, no Dock icon
-- Hold Right Option to record, release to transcribe, Esc to cancel
-- Parakeet v3 (25 European languages + JA + ZH) via FluidAudio, batch transcribe on release
+- Configurable modifier hotkey (default Right Option), Hold or Toggle mode, Esc cancels
+- Parakeet v3 (25 European languages + JA + ZH) via FluidAudio, batch transcribe on stop
 - Paste into the frontmost app via clipboard swap + synthetic Cmd+V, clipboard restored after
-- Floating HUD: Listening / Transcribing
+- HUD styles: bottom panel capsule, or notch extension (top pill fallback on external displays)
+- Settings window (Cmd+,): shortcut, mode, launch at login, HUD style, replacements, history
+- Word replacements: case-insensitive whole-word find/replace applied after transcription
+- Transcript history: last 50, stored locally only, Paste Last Transcription in the menu
 - First run: mic prompt, Accessibility prompt, one-time ~600 MB model download
 
 Out (v2+ backlog, roughly in order):
 
 1. AI cleanup pass using Apple Foundation Models (on-device, zero extra install on macOS 26)
-2. Configurable hotkey + toggle mode (Handy-style)
-3. Personal dictionary, auto-learned corrections (OpenWhispr-style)
-4. Streaming partial transcript in the HUD (FluidAudio SlidingWindowAsrManager)
-5. Launch at login, in-app updates
-6. Transcript history window
+2. Auto-learned corrections (OpenWhispr-style), building on word replacements
+3. Streaming partial transcript in the HUD (FluidAudio SlidingWindowAsrManager)
+4. In-app updates
 
 ## Decisions
 
