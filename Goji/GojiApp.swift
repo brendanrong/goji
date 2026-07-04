@@ -24,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private(set) lazy var controller = DictationController(state: state)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        SettingsStore.shared.applyDockPolicy()
         controller.start()
     }
 

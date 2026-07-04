@@ -24,6 +24,7 @@ struct SettingsView: View {
                 .pickerStyle(.segmented)
                 Toggle("Launch at login", isOn: $settings.launchAtLogin)
                 Toggle("Show in menu bar", isOn: $settings.showInMenuBar)
+                Toggle("Show in Dock", isOn: $settings.showInDock)
                 Toggle("Play start/stop sounds", isOn: $settings.playSounds)
                 if !settings.showInMenuBar {
                     Text("Icon hidden. Launch Goji again from Spotlight or Finder to bring it back.")

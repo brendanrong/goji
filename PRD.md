@@ -33,7 +33,8 @@ In:
 - Start/stop sound cues (toggleable)
 - Optional AI cleanup: Apple Foundation Models on-device (macOS 26 + Apple Intelligence), off by default
 - Mic input picker with live Test Mic meter
-- Willow-style notch HUD: app icon wing, live waveform, amber mic pill, spring slide-down
+- Willow-style notch HUD: compact blob barely wider than the notch, flared corners blending into the bar, app icon + live waveform + amber mic pill, grows out of the notch
+- Dock icon toggle (runtime activation policy; LSUIElement stays set)
 - make-dmg.sh: Release build + DMG, optional bundled model (BUNDLE_MODEL=1), optional notarization (NOTARIZE=1)
 - First run: mic prompt, Accessibility prompt, one-time ~600 MB model download (skipped when the model is bundled)
 
