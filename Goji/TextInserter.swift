@@ -14,9 +14,12 @@ final class TextInserter {
         postCommandV()
 
         // Restore the original clipboard once the paste has had time to land,
-        // but only if nothing newer was copied in the meantime. Preserves every
-        // representation (images, files, RTF), not just plain text.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+        // but only if nothing newer was copied in the meantime. Electron apps
+        // (Cowork, Slack) handle Cmd+V asynchronously and can read the
+        // pasteboard hundreds of ms later when their renderer is busy, so give
+        // them a full second. Preserves every representation (images, files,
+        // RTF), not just plain text.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             guard pasteboard.changeCount == ourChangeCount else { return }
             pasteboard.clearContents()
             if !saved.isEmpty {
