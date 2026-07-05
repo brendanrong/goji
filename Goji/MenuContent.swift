@@ -6,7 +6,6 @@ struct MenuContent: View {
     let controller: DictationController
     @ObservedObject private var settings = SettingsStore.shared
     @ObservedObject private var history = HistoryStore.shared
-    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         Group {
@@ -43,8 +42,7 @@ struct MenuContent: View {
             Divider()
 
             Button("Settings…") {
-                openSettings()
-                NSApp.activate(ignoringOtherApps: true)
+                SettingsWindow.shared.show()
             }
             .keyboardShortcut(",")
 
