@@ -111,6 +111,10 @@ final class SettingsStore: ObservableObject {
     @Published var playSounds: Bool {
         didSet { defaults.set(playSounds, forKey: Keys.playSounds) }
     }
+    /// Hold mode only: double-tapping the hotkey locks recording hands-free.
+    @Published var doubleTapLock: Bool {
+        didSet { defaults.set(doubleTapLock, forKey: Keys.doubleTapLock) }
+    }
     @Published var cleanupEnabled: Bool {
         didSet { defaults.set(cleanupEnabled, forKey: Keys.cleanupEnabled) }
     }
@@ -139,6 +143,7 @@ final class SettingsStore: ObservableObject {
         static let showInDock = "showInDock"
         static let micDeviceUID = "micDeviceUID"
         static let playSounds = "playSounds"
+        static let doubleTapLock = "doubleTapLock"
         static let cleanupEnabled = "cleanupEnabled"
     }
 
@@ -152,6 +157,7 @@ final class SettingsStore: ObservableObject {
         showInDock = (d.object(forKey: Keys.showInDock) as? Bool) ?? true
         micDeviceUID = d.string(forKey: Keys.micDeviceUID)
         playSounds = (d.object(forKey: Keys.playSounds) as? Bool) ?? true
+        doubleTapLock = (d.object(forKey: Keys.doubleTapLock) as? Bool) ?? true
         cleanupEnabled = d.bool(forKey: Keys.cleanupEnabled)
         if let data = d.data(forKey: Keys.replacements),
            let rules = try? JSONDecoder().decode([ReplacementRule].self, from: data) {

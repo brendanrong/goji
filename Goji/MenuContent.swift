@@ -62,7 +62,9 @@ struct MenuContent: View {
     private var hintLine: String {
         switch settings.activationMode {
         case .hold:
-            return "Hold \(settings.hotkeyKey.shortLabel) to dictate. Esc cancels."
+            return settings.doubleTapLock
+                ? "Hold \(settings.hotkeyKey.shortLabel) to dictate, double-tap to lock. Esc cancels."
+                : "Hold \(settings.hotkeyKey.shortLabel) to dictate. Esc cancels."
         case .toggle:
             return "Tap \(settings.hotkeyKey.shortLabel) to start/stop. Esc cancels."
         }

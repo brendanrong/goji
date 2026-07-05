@@ -17,6 +17,18 @@ final class DictationController {
     /// Recordings shorter than this are treated as accidental taps and dropped.
     private let minimumSamples = Int(0.3 * AudioRecorder.sampleRate)
 
+    // Double-tap lock (hold mode): a quick tap-tap locks recording hands-free,
+    // the next tap finishes it. State below tracks the tap timing.
+    private let doubleTapWindow: TimeInterval = 0.35
+    private var locked = false
+    private var pressStartedAt: Date?
+    private var shortTapReleasedAt: Date?
+    private var lockGraceWork: DispatchWorkItem?
+
+    private var lockEnabled: Bool {
+        settings.activationMode == .hold && settings.doubleTapLock
+    }
+
     init(state: AppState) {
         self.state = state
     }
@@ -108,6 +120,22 @@ final class DictationController {
     private func hotkeyDown() {
         switch settings.activationMode {
         case .hold:
+            if locked {
+                finishRecording()
+                return
+            }
+            if state.phase == .recording {
+                // Second tap inside the grace window: lock recording on.
+                if lockEnabled, let released = shortTapReleasedAt,
+                    Date().timeIntervalSince(released) <= doubleTapWindow {
+                    lockGraceWork?.cancel()
+                    lockGraceWork = nil
+                    shortTapReleasedAt = nil
+                    locked = true
+                }
+                return
+            }
+            pressStartedAt = Date()
             beginRecording()
         case .toggle:
             if state.phase == .recording {
@@ -119,8 +147,32 @@ final class DictationController {
     }
 
     private func hotkeyUp() {
-        guard settings.activationMode == .hold else { return }
-        finishRecording()
+        guard settings.activationMode == .hold, !locked else { return }
+        guard state.phase == .recording else { return }
+
+        let pressDuration = pressStartedAt.map { Date().timeIntervalSince($0) } ?? .infinity
+        guard lockEnabled, pressDuration <= doubleTapWindow else {
+            finishRecording()
+            return
+        }
+        // Short tap: keep recording briefly in case a lock tap follows. If none
+        // arrives, finish normally (sub-0.3s audio is dropped as accidental).
+        shortTapReleasedAt = Date()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, !self.locked else { return }
+            self.shortTapReleasedAt = nil
+            self.finishRecording()
+        }
+        lockGraceWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + doubleTapWindow, execute: work)
+    }
+
+    private func resetLockState() {
+        locked = false
+        pressStartedAt = nil
+        shortTapReleasedAt = nil
+        lockGraceWork?.cancel()
+        lockGraceWork = nil
     }
 
     private func beginRecording() {
@@ -141,6 +193,7 @@ final class DictationController {
 
     private func finishRecording() {
         guard state.phase == .recording else { return }
+        resetLockState()
         escape.disarm()
         let samples = recorder.stop()
 
@@ -184,6 +237,7 @@ final class DictationController {
 
     private func cancelRecording() {
         guard state.phase == .recording else { return }
+        resetLockState()
         escape.disarm()
         _ = recorder.stop()
         state.phase = .idle

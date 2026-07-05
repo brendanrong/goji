@@ -28,6 +28,13 @@ struct GeneralPane: View {
                     .labelsHidden()
                     .fixedSize()
                 }
+                if settings.activationMode == .hold {
+                    Divider()
+                    SettingsRow("Double-tap to lock recording") {
+                        Toggle("Double-tap to lock recording", isOn: $settings.doubleTapLock)
+                            .labelsHidden()
+                    }
+                }
                 Divider()
                 SettingsRow("Play start/stop sounds") {
                     Toggle("Play start/stop sounds", isOn: $settings.playSounds)
@@ -64,7 +71,9 @@ struct GeneralPane: View {
     private var modeHint: String {
         switch settings.activationMode {
         case .hold:
-            return "Hold \(settings.hotkeyKey.shortLabel), speak, release. Esc cancels."
+            return settings.doubleTapLock
+                ? "Hold \(settings.hotkeyKey.shortLabel), speak, release. Double-tap to keep recording hands-free, tap again to finish. Esc cancels."
+                : "Hold \(settings.hotkeyKey.shortLabel), speak, release. Esc cancels."
         case .toggle:
             return "Tap \(settings.hotkeyKey.shortLabel) to start, tap again to finish. Esc cancels."
         }
