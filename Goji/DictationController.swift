@@ -80,6 +80,7 @@ final class DictationController {
 
     private func beginRecording() {
         guard state.phase == .idle, state.modelState == .ready else { return }
+        state.lastError = nil
         do {
             try recorder.start(deviceUID: settings.micDeviceUID)
             state.phase = .recording
