@@ -33,9 +33,15 @@ struct MenuContent: View {
                 }
             }
 
+            if state.modelState == .needsDownload {
+                Button("Download Speech Model (600 MB)…") {
+                    WelcomeWindow.shared.show(state: state, controller: controller)
+                }
+            }
+
             if case .failed = state.modelState {
                 Button("Retry model download") {
-                    controller.loadModels()
+                    controller.downloadModels()
                 }
             }
 
@@ -64,6 +70,10 @@ struct MenuContent: View {
 
     private var statusLine: String {
         switch state.modelState {
+        case .needsDownload:
+            return "Speech model not downloaded"
+        case .downloading(let fraction, let label):
+            return "\(label) \(Int(fraction * 100))%"
         case .preparing(let status):
             return status
         case .failed(let message):
