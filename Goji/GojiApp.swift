@@ -68,19 +68,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 struct MenuBarLabel: View {
     @ObservedObject var state: AppState
 
+    /// The goji berry mark (template asset) when idle or recording; SF Symbols
+    /// only for transient states where the shape itself carries meaning.
     var body: some View {
-        Image(systemName: symbol)
-    }
-
-    private var symbol: String {
         switch state.phase {
-        case .recording: return "mic.fill"
-        case .transcribing: return "waveform"
+        case .recording:
+            Image("MenuBarIconFill")
+        case .transcribing:
+            Image(systemName: "waveform")
         case .idle:
             switch state.modelState {
-            case .ready: return "mic"
-            case .needsDownload, .downloading, .preparing: return "arrow.down.circle"
-            case .failed: return "mic.slash"
+            case .ready:
+                Image("MenuBarIcon")
+            case .needsDownload, .downloading, .preparing:
+                Image(systemName: "arrow.down.circle")
+            case .failed:
+                Image(systemName: "exclamationmark.triangle")
             }
         }
     }
