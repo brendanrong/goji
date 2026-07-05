@@ -7,6 +7,7 @@ final class DictationController {
     private let settings = SettingsStore.shared
     private let history = HistoryStore.shared
     private let hotkey = HotkeyMonitor()
+    private let escape = EscapeInterceptor()
     private let recorder = AudioRecorder()
     private let transcriber = Transcriber()
     private let inserter = TextInserter()
@@ -25,8 +26,9 @@ final class DictationController {
 
         hotkey.onHotkeyDown = { [weak self] in self?.hotkeyDown() }
         hotkey.onHotkeyUp = { [weak self] in self?.hotkeyUp() }
-        hotkey.onEscape = { [weak self] in self?.cancelRecording() }
         hotkey.start()
+
+        escape.onEscape = { [weak self] in self?.cancelRecording() }
 
         recorder.onLevel = { [weak self] level in
             self?.hud.updateLevel(level)
@@ -84,6 +86,7 @@ final class DictationController {
         do {
             try recorder.start(deviceUID: settings.micDeviceUID)
             state.phase = .recording
+            escape.arm()
             hud.show(.listening, style: settings.hudStyle)
             if settings.playSounds {
                 Sounds.recordingStarted()
@@ -95,6 +98,7 @@ final class DictationController {
 
     private func finishRecording() {
         guard state.phase == .recording else { return }
+        escape.disarm()
         let samples = recorder.stop()
 
         guard samples.count >= minimumSamples else {
@@ -137,6 +141,7 @@ final class DictationController {
 
     private func cancelRecording() {
         guard state.phase == .recording else { return }
+        escape.disarm()
         _ = recorder.stop()
         state.phase = .idle
         hud.hide()

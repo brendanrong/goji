@@ -1,20 +1,19 @@
 import AppKit
 
 /// Global monitors for the dictation key (a single modifier, read live from
-/// SettingsStore) and Esc. Emits raw down/up transitions; DictationController
-/// decides what they mean based on Hold vs Toggle mode.
+/// SettingsStore). Emits raw down/up transitions; DictationController decides
+/// what they mean based on Hold vs Toggle mode. Esc handling lives in
+/// EscapeInterceptor (it must consume the event, which monitors can't).
 /// Global NSEvent monitors only deliver events once Accessibility is granted,
 /// which Goji needs anyway to paste.
 @MainActor
 final class HotkeyMonitor {
     var onHotkeyDown: (() -> Void)?
     var onHotkeyUp: (() -> Void)?
-    var onEscape: (() -> Void)?
 
     private var monitors: [Any] = []
     private var keyIsDown = false
     private var downKeyCode: UInt16?
-    private let escapeCode: UInt16 = 53
 
     func start() {
         guard monitors.isEmpty else { return }
@@ -31,13 +30,6 @@ final class HotkeyMonitor {
             return event
         }) {
             monitors.append(local)
-        }
-
-        if let escape = NSEvent.addGlobalMonitorForEvents(matching: .keyDown, handler: { [weak self] event in
-            guard let self, event.keyCode == self.escapeCode else { return }
-            self.onEscape?()
-        }) {
-            monitors.append(escape)
         }
     }
 
