@@ -12,6 +12,12 @@ enum Sounds {
 
     private static func play(_ name: String, volume: Float) {
         guard let sound = NSSound(named: name) else { return }
+        // NSSound(named:) returns a cached shared instance; play() on one that
+        // is still ringing is a no-op ("Already playing" in the console) and
+        // the cue silently drops. Restart it instead.
+        if sound.isPlaying {
+            sound.stop()
+        }
         sound.volume = volume
         sound.play()
     }
