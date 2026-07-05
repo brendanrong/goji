@@ -53,7 +53,14 @@ codesign --force --options runtime --timestamp \
 codesign --verify --deep --strict "$APP"
 echo "Signed with: $IDENTITY"
 
-hdiutil create -volname Goji -srcfolder "$APP" -ov -format UDZO dist/Goji.dmg
+# Stage the app next to an /Applications symlink so the mounted DMG offers
+# the standard drag-to-install target.
+STAGING=/tmp/goji-dmg
+rm -rf "$STAGING"
+mkdir -p "$STAGING"
+ditto "$APP" "$STAGING/Goji.app"
+ln -s /Applications "$STAGING/Applications"
+hdiutil create -volname Goji -srcfolder "$STAGING" -ov -format UDZO dist/Goji.dmg
 
 if [[ "${NOTARIZE:-0}" == "1" ]]; then
   xcrun notarytool submit dist/Goji.dmg --keychain-profile "$NOTARY_PROFILE" --wait
