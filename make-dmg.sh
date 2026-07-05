@@ -10,13 +10,15 @@
 # Signing: apps are signed with the Developer ID Application cert in the login
 # keychain (hardened runtime, timestamped), which is what Gatekeeper wants for
 # apps distributed outside the App Store. Override with IDENTITY=... if needed.
-# Notary: uses the account-level keychain profile stored for LiveWall releases
-# (notary profiles aren't app-specific). Override with NOTARY_PROFILE=...
+# Notary: uses the goji-notary keychain profile. One-time setup:
+#   xcrun notarytool store-credentials goji-notary --apple-id "<your Apple ID>" --team-id VTMKE23N5G
+# (prompts for an app-specific password from account.apple.com).
+# Override with NOTARY_PROFILE=...
 set -euo pipefail
 cd "$(dirname "$0")"
 
 IDENTITY="${IDENTITY:-Developer ID Application}"
-NOTARY_PROFILE="${NOTARY_PROFILE:-LiveWall-Notary}"
+NOTARY_PROFILE="${NOTARY_PROFILE:-goji-notary}"
 
 DERIVED=/tmp/goji-build
 rm -rf "$DERIVED" dist
