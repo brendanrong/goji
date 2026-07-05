@@ -48,7 +48,7 @@ Read PRD.md for scope. v1 is the core loop plus a lean settings window. Don't go
 - Sandbox is OFF on purpose (synthetic keystrokes need it off). Hardened runtime is ON with the audio-input entitlement, so notarization works later.
 - git from the Cowork sandbox: prefix read commands with `GIT_OPTIONAL_LOCKS=0`.
 - `Cleaner.swift` uses the FoundationModels framework (LanguageModelSession). Unlike FluidAudio there's no local source snapshot for it; if it breaks on an SDK update, check Apple's current API before fighting the compiler.
-- `make-dmg.sh`: Release build + Developer ID signing + DMG. Signs with the "Developer ID Application" cert (team VTMKE23N5G) and strips get-task-allow so notarization passes. `BUNDLE_MODEL=1` copies the Parakeet model from `~/Library/Application Support/FluidAudio/Models/` into `Contents/Resources/FluidAudioModels/` (Transcriber checks there first). `NOTARIZE=1` submits + staples using the existing account-level `LiveWall-Notary` keychain profile (notary profiles aren't app-specific).
+- `make-dmg.sh`: Release build + Developer ID signing + DMG. Signs with the "Developer ID Application" cert (team VTMKE23N5G) and strips get-task-allow so notarization passes. `BUNDLE_MODEL=1` copies the Parakeet model from `~/Library/Application Support/FluidAudio/Models/` into `Contents/Resources/FluidAudioModels/` (Transcriber checks there first). `NOTARIZE=1` submits + staples using the `goji-notary` keychain profile (one-time: `xcrun notarytool store-credentials goji-notary --apple-id <Apple ID> --team-id VTMKE23N5G` with an app-specific password).
 
 ## Conventions
 
