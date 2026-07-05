@@ -16,14 +16,18 @@ Read PRD.md for scope. v1 is the core loop plus a lean settings window. Don't go
 - `GojiApp.swift`: @main, MenuBarExtra scene, app delegate.
 - `AppState.swift`: observable state (model status, phase, permissions).
 - `DictationController.swift`: the brain. Wires hotkey -> recorder -> transcriber -> inserter.
-- `HotkeyMonitor.swift`: global NSEvent monitors. Emits raw down/up for the configured modifier key (read live from SettingsStore), plus Esc.
+- `HotkeyMonitor.swift`: global NSEvent monitors. Emits raw down/up for the configured modifier key (read live from SettingsStore).
+- `EscapeInterceptor.swift`: CGEventTap that swallows Esc, armed only while recording, so cancelling a dictation doesn't leak Esc into the frontmost app.
 - `AudioRecorder.swift`: AVAudioEngine tap, converts to 16 kHz mono Float32.
 - `Transcriber.swift`: FluidAudio AsrManager wrapper (actor).
-- `TextInserter.swift`: pasteboard swap + synthetic Cmd+V, restores clipboard after 0.4 s.
+- `TextInserter.swift`: pasteboard swap + synthetic Cmd+V, restores clipboard after 1 s (Electron paste handlers read it late).
 - `HUD.swift`: HUDController, places the indicator (bottom panel, notch extension, or top pill fallback).
 - `HUDViews.swift`: the SwiftUI indicator views (capsule + notch shapes).
 - `SettingsStore.swift`: user prefs (hotkey, hold/toggle, HUD style, login item, replacements). UserDefaults-backed, applied live, no restart needed.
-- `SettingsView.swift`: single-pane grouped Settings window (Cmd+,).
+- `SettingsView.swift`: settings shell — sidebar navigation (General/Microphone/Transcription/History/About) + detail pane.
+- `SettingsPanes.swift`: the individual settings panes and the mic test preview.
+- `SettingsControls.swift`: card/row/scaffold building blocks the panes are made of.
+- `SettingsWindow.swift`: managed NSWindow that hosts SettingsView. Exists because SwiftUI's Settings scene is broken for menu bar apps on macOS 26.
 - `HistoryStore.swift`: recent transcripts, capped at 50, local UserDefaults only.
 - `MicDevices.swift`: CoreAudio input-device listing + UID resolution for the mic picker.
 - `Cleaner.swift`: optional on-device AI cleanup (Apple Foundation Models, macOS 26+). Returns raw text on any failure.
@@ -33,6 +37,9 @@ Read PRD.md for scope. v1 is the core loop plus a lean settings window. Don't go
 
 ## Gotchas
 
+- SwiftUI's `Settings` scene / `openSettings()` / `SettingsLink` silently no-op for menu-bar-only apps on macOS 26 (Tahoe) — no window render tree to resolve against (see steipete.me post from Jun 2025). That's why `SettingsWindow.swift` manages a plain NSWindow. Don't reintroduce a `Settings` scene.
+- A grouped SwiftUI `Form` (List-backed) inside an NSHostingView window sends the macOS 26 layout engine into an exponential re-measure: window paints once, then the main thread pegs (beachball, dead controls). Confirmed via `sample`. Settings panes use the hand-rolled cards in `SettingsControls.swift` instead — don't swap them back to `Form`.
+- NSEvent global monitors are observe-only. Anything that must CONSUME a key (Esc during recording) needs a CGEventTap — see `EscapeInterceptor.swift`. Keep taps armed only while recording; a stalled always-on tap degrades typing system-wide.
 - `project.pbxproj` is hand-written (objectVersion 70, synchronized folder). New `.swift` files dropped into `Goji/` are picked up automatically. Never add per-file PBX entries.
 - FluidAudio resolves to 0.15.x (pbxproj says `from: 0.12.4`, upToNextMajor). Their README and docs lag the real API. The exact source Xcode compiles against is snapshotted in `.fluidaudio-src/` (gitignored): grep THAT, not the docs, before touching any FluidAudio call. Refresh the snapshot from `~/Library/Developer/Xcode/DerivedData/Goji-*/SourcePackages/checkouts/FluidAudio/Sources/FluidAudio` after any version bump.
 - `AsrManager.transcribe` requires `decoderState: inout TdtDecoderState` (fresh one per utterance). The simpler-looking `UnifiedAsrManager` is a DIFFERENT model (Parakeet Unified, not multilingual v3), don't switch to it casually.
