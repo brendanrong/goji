@@ -28,6 +28,17 @@ enum HotkeyKey: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Device-dependent modifier bit, distinguishes left vs right of the same key.
+    var deviceMask: UInt {
+        switch self {
+        case .rightOption: return 0x40
+        case .leftOption: return 0x20
+        case .rightCommand: return 0x10
+        case .rightControl: return 0x2000
+        case .leftControl: return 0x01
+        }
+    }
+
     var label: String {
         switch self {
         case .rightOption: return "Right ⌥ Option"
