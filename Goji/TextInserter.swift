@@ -6,17 +6,37 @@ import AppKit
 final class TextInserter {
     func insert(_ text: String) {
         let pasteboard = NSPasteboard.general
-        let saved = pasteboard.string(forType: .string)
+        let saved = snapshot(pasteboard)
 
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
+        let ourChangeCount = pasteboard.changeCount
         postCommandV()
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+        // Restore the original clipboard once the paste has had time to land,
+        // but only if nothing newer was copied in the meantime. Preserves every
+        // representation (images, files, RTF), not just plain text.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            guard pasteboard.changeCount == ourChangeCount else { return }
             pasteboard.clearContents()
-            if let saved {
-                pasteboard.setString(saved, forType: .string)
+            if !saved.isEmpty {
+                pasteboard.writeObjects(saved)
             }
+        }
+    }
+
+    /// Deep-copies every item on the pasteboard so it can be put back after we
+    /// borrow the clipboard for the paste.
+    private func snapshot(_ pasteboard: NSPasteboard) -> [NSPasteboardItem] {
+        guard let items = pasteboard.pasteboardItems else { return [] }
+        return items.map { item in
+            let copy = NSPasteboardItem()
+            for type in item.types {
+                if let data = item.data(forType: type) {
+                    copy.setData(data, forType: type)
+                }
+            }
+            return copy
         }
     }
 
