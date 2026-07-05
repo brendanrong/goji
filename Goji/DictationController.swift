@@ -1,4 +1,5 @@
 import AppKit
+import FluidAudio
 
 /// The brain. Wires hotkey -> recorder -> transcriber -> inserter and keeps AppState in sync.
 @MainActor
@@ -34,14 +35,56 @@ final class DictationController {
             self?.hud.updateLevel(level)
         }
 
-        loadModels()
+        if Transcriber.modelsAvailableLocally {
+            loadModels()
+        } else {
+            // Fresh install: don't pull 600 MB without asking. The welcome
+            // window explains and offers the download.
+            state.modelState = .needsDownload
+            WelcomeWindow.shared.show(state: state, controller: self)
+        }
     }
 
+    /// Quiet path: the model is bundled or already cached, just load it.
     func loadModels() {
-        state.modelState = .preparing("Downloading model (one-time, ~600 MB)…")
+        state.modelState = .preparing("Loading speech model…")
         Task {
             do {
                 try await transcriber.prepare()
+                state.modelState = .ready
+            } catch {
+                state.modelState = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    /// Explicit path: user approved the one-time model download. Reports
+    /// progress into AppState so the welcome window and menu can show it.
+    func downloadModels() {
+        switch state.modelState {
+        case .ready, .downloading, .preparing:
+            return
+        case .needsDownload, .failed:
+            break
+        }
+        state.modelState = .downloading(0, "Contacting server…")
+        Task {
+            do {
+                try await transcriber.prepare { progress in
+                    let label: String
+                    switch progress.phase {
+                    case .listing:
+                        label = "Contacting server…"
+                    case .downloading(let done, let total):
+                        label = "Downloading speech model (file \(min(done + 1, total)) of \(total))…"
+                    case .compiling:
+                        label = "Optimizing for this Mac…"
+                    }
+                    let fraction = progress.fractionCompleted
+                    Task { @MainActor [weak self] in
+                        self?.state.modelState = .downloading(fraction, label)
+                    }
+                }
                 state.modelState = .ready
             } catch {
                 state.modelState = .failed(error.localizedDescription)

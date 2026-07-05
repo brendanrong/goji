@@ -70,7 +70,7 @@ struct MenuBarLabel: View {
         case .idle:
             switch state.modelState {
             case .ready: return "mic"
-            case .preparing: return "arrow.down.circle"
+            case .needsDownload, .downloading, .preparing: return "arrow.down.circle"
             case .failed: return "mic.slash"
             }
         }

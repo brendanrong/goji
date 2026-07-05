@@ -7,9 +7,24 @@ import Foundation
 actor Transcriber {
     private var manager: AsrManager?
 
-    func prepare() async throws {
+    /// True when no download is needed: either a model is bundled inside the
+    /// app or one is already in the FluidAudio cache.
+    nonisolated static var modelsAvailableLocally: Bool {
+        if let bundled = bundledModelURL, FileManager.default.fileExists(atPath: bundled.path) {
+            return true
+        }
+        return AsrModels.modelsExist(at: AsrModels.defaultCacheDirectory(for: .v3), version: .v3)
+    }
+
+    private nonisolated static var bundledModelURL: URL? {
+        Bundle.main.resourceURL?
+            .appendingPathComponent("FluidAudioModels", isDirectory: true)
+            .appendingPathComponent("parakeet-tdt-0.6b-v3-coreml", isDirectory: true)
+    }
+
+    func prepare(progressHandler: DownloadUtils.ProgressHandler? = nil) async throws {
         guard manager == nil else { return }
-        let models = try await Self.loadModels()
+        let models = try await Self.loadModels(progressHandler: progressHandler)
         let asr = AsrManager(config: .default)
         try await asr.loadModels(models)
         manager = asr
@@ -17,18 +32,16 @@ actor Transcriber {
 
     /// Prefers a model bundled inside the app (Canva distribution: no download on
     /// first run), falls back to the download-and-cache path.
-    private static func loadModels() async throws -> AsrModels {
-        if let bundled = Bundle.main.resourceURL?
-            .appendingPathComponent("FluidAudioModels", isDirectory: true)
-            .appendingPathComponent("parakeet-tdt-0.6b-v3-coreml", isDirectory: true),
+    private static func loadModels(progressHandler: DownloadUtils.ProgressHandler?) async throws -> AsrModels {
+        if let bundled = bundledModelURL,
             FileManager.default.fileExists(atPath: bundled.path) {
             do {
-                return try await AsrModels.load(from: bundled, version: .v3)
+                return try await AsrModels.load(from: bundled, version: .v3, progressHandler: progressHandler)
             } catch {
                 // Incomplete or stale bundle: fall through to the normal path.
             }
         }
-        return try await AsrModels.downloadAndLoad(version: .v3)
+        return try await AsrModels.downloadAndLoad(version: .v3, progressHandler: progressHandler)
     }
 
     /// Expects 16 kHz mono Float32 samples.
