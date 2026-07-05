@@ -9,16 +9,23 @@ final class AudioRecorder {
     /// Mic level callback (0...1), delivered on the main queue while recording.
     var onLevel: ((Float) -> Void)?
 
-    private let engine = AVAudioEngine()
+    private var engine: AVAudioEngine?
     private let lock = NSLock()
     private var samples: [Float] = []
     private var converter: AVAudioConverter?
 
     func start(deviceUID: String? = nil) throws {
+        // Fresh engine every recording. A long-lived AVAudioEngine goes stale
+        // across sleep/wake and input-device changes; rebuilding it each time is
+        // the simplest way to survive both without an app restart.
+        teardown()
+
         lock.lock()
         samples.removeAll()
         lock.unlock()
 
+        let engine = AVAudioEngine()
+        self.engine = engine
         let input = engine.inputNode
 
         // Route to the chosen mic; silently fall back to the system default.
@@ -39,6 +46,7 @@ final class AudioRecorder {
         let inputFormat = input.outputFormat(forBus: 0)
 
         guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0 else {
+            teardown()
             throw GojiError("No microphone input available. Check mic permission in System Settings > Privacy & Security > Microphone.")
         }
         guard let outputFormat = AVAudioFormat(
@@ -47,6 +55,7 @@ final class AudioRecorder {
             channels: 1,
             interleaved: false
         ) else {
+            teardown()
             throw GojiError("Could not create 16 kHz audio format.")
         }
 
@@ -56,17 +65,29 @@ final class AudioRecorder {
             self?.append(buffer, outputFormat: outputFormat)
         }
         engine.prepare()
-        try engine.start()
+        do {
+            try engine.start()
+        } catch {
+            teardown()
+            throw error
+        }
     }
 
     func stop() -> [Float] {
-        engine.inputNode.removeTap(onBus: 0)
-        engine.stop()
-        converter = nil
-
+        teardown()
         lock.lock()
         defer { lock.unlock() }
         return samples
+    }
+
+    /// Stops the tap and releases the engine. Idempotent.
+    private func teardown() {
+        if let engine {
+            engine.inputNode.removeTap(onBus: 0)
+            engine.stop()
+        }
+        engine = nil
+        converter = nil
     }
 
     private func append(_ buffer: AVAudioPCMBuffer, outputFormat: AVAudioFormat) {
