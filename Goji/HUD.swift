@@ -22,6 +22,11 @@ final class HUDController {
     private let model = HUDModel()
 
     func show(_ mode: Mode, style: HUDStyle) {
+        if mode == .listening {
+            // The app being dictated into. Goji never activates itself, so the
+            // frontmost app at recording start is the paste target.
+            model.frontAppIcon = NSWorkspace.shared.frontmostApplication?.icon
+        }
         model.mode = mode
         let placement = placement(for: style)
         if panel == nil || placement != currentPlacement {
@@ -67,8 +72,9 @@ final class HUDController {
             newPanel.level = .statusBar
             newPanel.contentView = NSHostingView(rootView: PanelHUDView(model: model))
         case .notch(let notch):
-            // Barely wider than the notch itself: Willow-style, never covers menu bar items.
-            newPanel = makePanel(size: NSSize(width: notch.width + 190, height: notch.height + 14))
+            // Barely wider than the notch and EXACTLY its height: Willow-style
+            // wings beside the notch, flush with the menu bar, nothing below it.
+            newPanel = makePanel(size: NSSize(width: notch.width + 120, height: notch.height))
             newPanel.level = .screenSaver
             newPanel.contentView = NSHostingView(rootView: NotchHUDView(model: model, notchWidth: notch.width))
         }

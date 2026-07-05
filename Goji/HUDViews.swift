@@ -5,6 +5,8 @@ final class HUDModel: ObservableObject {
     @Published var mode: HUDController.Mode = .listening
     @Published var level: Float = 0
     @Published var visible = false
+    /// Icon of the app being dictated into, captured at recording start.
+    @Published var frontAppIcon: NSImage?
 }
 
 /// Live waveform bars driven by the real mic level.
@@ -59,11 +61,12 @@ struct PanelHUDView: View {
     }
 }
 
-/// The classic notch-extension outline: flared top corners that blend into the
-/// menu bar's black, rounded bottom corners. Reads as "the notch grew".
+/// The notch-extension outline: concave flares at the top corners that blend
+/// into the menu bar's black, small rounded bottom corners matching the real
+/// notch. Drawn at exactly notch height it reads as "the notch got wider".
 struct NotchShape: Shape {
-    var topRadius: CGFloat = 10
-    var bottomRadius: CGFloat = 14
+    var topRadius: CGFloat = 8
+    var bottomRadius: CGFloat = 12
 
     func path(in rect: CGRect) -> Path {
         var p = Path()
@@ -92,32 +95,31 @@ struct NotchShape: Shape {
     }
 }
 
-/// Willow-style notch companion: a compact blob barely wider than the notch,
-/// app icon in the left wing, waveform + amber mic pill in the right wing.
-/// Grows out of the notch itself.
+/// Willow-style notch companion: tight wings at exactly notch height, the
+/// frontmost app's icon in the left wing (the app being dictated into), a
+/// compact waveform + amber mic glyph in the right wing. Never extends below
+/// the notch line.
 struct NotchHUDView: View {
     @ObservedObject var model: HUDModel
     var notchWidth: CGFloat
 
     var body: some View {
         GeometryReader { geo in
-            let inset: CGFloat = 20  // top flare + breathing room
+            let inset: CGFloat = 12  // top flare + breathing room
             let wing = max((geo.size.width - notchWidth) / 2 - inset, 0)
             ZStack {
                 NotchShape()
                     .fill(.black)
 
                 HStack(spacing: 0) {
-                    // Left wing: mini app icon.
+                    // Left wing: the app being dictated into.
                     HStack {
                         Spacer(minLength: 0)
-                        if let icon = NSApp.applicationIconImage {
-                            Image(nsImage: icon)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 19, height: 19)
-                                .clipShape(RoundedRectangle(cornerRadius: 5))
-                        }
+                        Image(nsImage: model.frontAppIcon ?? NSApp.applicationIconImage)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 18, height: 18)
+                            .clipShape(RoundedRectangle(cornerRadius: 4.5))
                         Spacer(minLength: 0)
                     }
                     .frame(width: wing)
@@ -126,28 +128,22 @@ struct NotchHUDView: View {
                     Spacer()
                         .frame(width: notchWidth)
 
-                    // Right wing: live waveform + state pill.
-                    HStack(spacing: 6) {
+                    // Right wing: compact waveform + small mic glyph.
+                    HStack(spacing: 5) {
                         if model.mode == .listening {
-                            WaveformBars(level: model.level, color: .white, barCount: 6, barWidth: 2.5, maxHeight: 11)
-                            Capsule()
-                                .fill(Color(red: 0.96, green: 0.63, blue: 0.24))
-                                .frame(width: 30, height: 18)
-                                .overlay(
-                                    Image(systemName: "mic.fill")
-                                        .font(.system(size: 10, weight: .semibold))
-                                        .foregroundStyle(.black.opacity(0.72))
-                                )
+                            WaveformBars(level: model.level, color: .white, barCount: 5, barWidth: 2, maxHeight: 9)
+                            Image(systemName: "mic.fill")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(Color(red: 0.96, green: 0.63, blue: 0.24))
                         } else {
                             ProgressView()
-                                .controlSize(.small)
+                                .controlSize(.mini)
                         }
                     }
                     .frame(width: wing)
                 }
                 .padding(.horizontal, inset)
-                .frame(height: max(geo.size.height - 10, 0), alignment: .center)
-                .frame(maxHeight: .infinity, alignment: .top)
+                .frame(maxHeight: .infinity, alignment: .center)
             }
             .scaleEffect(model.visible ? 1 : 0.35, anchor: .top)
             .opacity(model.visible ? 1 : 0)
