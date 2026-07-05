@@ -231,6 +231,12 @@ struct AboutPane: View {
                     }
                 }
                 .padding(.vertical, 12)
+                Divider()
+                SettingsRow("Enjoying Goji?") {
+                    Button("Buy Me a Coffee") {
+                        NSWorkspace.shared.open(URL(string: "https://ko-fi.com/livewall")!)
+                    }
+                }
             }
             CaptionText("Everything runs on this Mac. Audio, transcripts, and settings never leave it.")
         }
