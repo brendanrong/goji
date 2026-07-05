@@ -60,7 +60,9 @@ final class HotkeyMonitor {
         }
 
         guard event.keyCode == key.keyCode else { return }
-        let pressed = event.modifierFlags.contains(key.flag)
+        // Use the device-dependent mask (distinguishes left vs right) so holding
+        // the other Option/Control key can't mask this key's release.
+        let pressed = (event.modifierFlags.rawValue & key.deviceMask) != 0
 
         if pressed && !keyIsDown {
             keyIsDown = true
