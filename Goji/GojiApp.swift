@@ -47,10 +47,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         }
     }
 
-    /// Escape hatch: relaunching Goji from Spotlight/Finder restores a hidden menu bar icon.
+    /// Dock icon click or Spotlight/Finder relaunch while running. Restores a
+    /// hidden menu bar icon, and with no window open it opens Settings (or the
+    /// welcome window on fresh installs) so the click always does something.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if !SettingsStore.shared.showInMenuBar {
             SettingsStore.shared.showInMenuBar = true
+        }
+        if !flag {
+            if state.modelState == .needsDownload {
+                WelcomeWindow.shared.show(state: state, controller: controller)
+            } else {
+                SettingsWindow.shared.show()
+            }
         }
         return true
     }
