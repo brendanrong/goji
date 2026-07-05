@@ -22,6 +22,19 @@ struct MenuContent: View {
             }
             .disabled(history.items.isEmpty)
 
+            // Quick mic switcher. The device list is fetched fresh every time
+            // the menu opens, so newly plugged-in mics show up immediately.
+            Menu("Microphone: \(currentMicName)") {
+                Picker("Microphone", selection: $settings.micDeviceUID) {
+                    Text("System Default").tag(String?.none)
+                    ForEach(MicDevices.inputDevices()) { device in
+                        Text(device.name).tag(String?.some(device.uid))
+                    }
+                }
+                .pickerStyle(.inline)
+                .labelsHidden()
+            }
+
             Text(hintLine)
 
             if !state.accessibilityGranted {
@@ -57,6 +70,11 @@ struct MenuContent: View {
             }
             .keyboardShortcut("q")
         }
+    }
+
+    private var currentMicName: String {
+        guard let uid = settings.micDeviceUID else { return "System Default" }
+        return MicDevices.inputDevices().first { $0.uid == uid }?.name ?? "Unavailable"
     }
 
     private var hintLine: String {
