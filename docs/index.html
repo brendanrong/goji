@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Goji — local, private dictation for macOS</title>
+<meta name="description" content="Hold a key, talk, release. Your words paste where your cursor is. Everything runs on your Mac. Nothing leaves it." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='55' r='34' fill='%23e0322f'/%3E%3Cpath d='M50 24c2-10 10-15 20-15-1 10-8 16-16 16z' fill='%234caf50'/%3E%3C/svg%3E" />
+<style>
+  :root {
+    --bg: #0e0b0c;
+    --bg-soft: #171213;
+    --card: #1c1617;
+    --line: #2c2223;
+    --text: #f3ebe9;
+    --muted: #a99b98;
+    --berry: #e0322f;
+    --berry-2: #ff6a3d;
+    --leaf: #57ab5a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: radial-gradient(1200px 600px at 50% -200px, #2a1414 0%, var(--bg) 55%);
+    color: var(--text);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 24px; }
+
+  /* Hero */
+  header { padding: 96px 0 56px; text-align: center; }
+  .mark {
+    width: 76px; height: 76px; margin: 0 auto 22px;
+    display: block;
+    filter: drop-shadow(0 6px 20px rgba(224, 50, 47, 0.35));
+  }
+  h1 { font-size: 60px; letter-spacing: -0.03em; font-weight: 700; }
+  .tagline { font-size: 21px; color: var(--muted); margin: 14px auto 0; max-width: 520px; }
+  .cta { margin-top: 36px; display: flex; gap: 14px; justify-content: center; align-items: center; flex-wrap: wrap; }
+  .btn {
+    background: linear-gradient(135deg, var(--berry), var(--berry-2));
+    color: #fff; text-decoration: none; font-weight: 600; font-size: 17px;
+    padding: 14px 28px; border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(224, 50, 47, 0.32);
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .btn:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(224, 50, 47, 0.42); }
+  .btn-ghost {
+    color: var(--text); text-decoration: none; font-weight: 600; font-size: 17px;
+    padding: 14px 22px; border-radius: 12px; border: 1px solid var(--line);
+  }
+  .btn-ghost:hover { border-color: var(--muted); }
+  .req { margin-top: 16px; font-size: 14px; color: var(--muted); }
+
+  /* HUD mock */
+  .hud {
+    margin: 48px auto 0; width: fit-content;
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(20,15,16,.9); border: 1px solid var(--line);
+    padding: 10px 18px; border-radius: 999px; backdrop-filter: blur(8px);
+  }
+  .bars { display: flex; align-items: center; gap: 3px; height: 20px; }
+  .bars span { width: 3px; border-radius: 3px; background: var(--berry); animation: bob 1s ease-in-out infinite; }
+  .bars span:nth-child(1){height:6px;animation-delay:0s}
+  .bars span:nth-child(2){height:14px;animation-delay:.1s}
+  .bars span:nth-child(3){height:20px;animation-delay:.2s}
+  .bars span:nth-child(4){height:11px;animation-delay:.3s}
+  .bars span:nth-child(5){height:17px;animation-delay:.15s}
+  .bars span:nth-child(6){height:8px;animation-delay:.25s}
+  .bars span:nth-child(7){height:14px;animation-delay:.05s}
+  @keyframes bob { 0%,100%{transform:scaleY(.5)} 50%{transform:scaleY(1)} }
+  .hud small { color: var(--muted); font-size: 13px; }
+
+  /* Sections */
+  section { padding: 40px 0; }
+  h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin-bottom: 24px; }
+  .features { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .feature { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
+  .feature h3 { font-size: 16px; margin-bottom: 6px; }
+  .feature p { font-size: 14px; color: var(--muted); }
+
+  /* Releases */
+  .release { border-left: 2px solid var(--line); padding: 0 0 28px 22px; position: relative; }
+  .release::before {
+    content: ""; position: absolute; left: -7px; top: 6px;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--berry); box-shadow: 0 0 0 4px var(--bg);
+  }
+  .release:last-child { padding-bottom: 0; }
+  .release .ver { font-size: 19px; font-weight: 700; }
+  .release .date { font-size: 13px; color: var(--muted); margin-left: 8px; font-weight: 400; }
+  .release ul { list-style: none; margin-top: 12px; }
+  .release li { font-size: 15px; color: var(--text); padding-left: 20px; position: relative; margin-bottom: 6px; }
+  .release li::before { content: "→"; position: absolute; left: 0; color: var(--berry); }
+  .release .lead { font-size: 15px; color: var(--muted); margin-top: 8px; }
+
+  footer { padding: 56px 0 72px; text-align: center; color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); margin-top: 32px; }
+  footer a { color: var(--text); }
+
+  @media (max-width: 560px) {
+    h1 { font-size: 44px; }
+    .tagline { font-size: 18px; }
+    .features { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <svg class="mark" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <circle cx="50" cy="56" r="33" fill="#e0322f"/>
+      <circle cx="50" cy="56" r="33" fill="url(#g)"/>
+      <path d="M50 25c2-11 11-17 22-16-1 11-9 18-18 17z" fill="#57ab5a"/>
+      <ellipse cx="40" cy="46" rx="8" ry="11" fill="#fff" opacity="0.18"/>
+      <defs>
+        <radialGradient id="g" cx="38%" cy="34%" r="72%">
+          <stop offset="0%" stop-color="#ff6a3d"/>
+          <stop offset="100%" stop-color="#e0322f"/>
+        </radialGradient>
+      </defs>
+    </svg>
+    <h1>Goji</h1>
+    <p class="tagline">Local, private dictation for macOS. Hold a key, talk, release. Your words appear where your cursor is.</p>
+
+    <div class="cta">
+      <a class="btn" href="https://github.com/brendanrong/goji/releases/latest/download/Goji.dmg">Download for macOS</a>
+      <a class="btn-ghost" href="https://github.com/brendanrong/goji">View on GitHub</a>
+    </div>
+    <p class="req">Requires macOS 14 or later. Apple Silicon recommended.</p>
+
+    <div class="hud" aria-hidden="true">
+      <span class="bars"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span>
+      <small>Listening…</small>
+    </div>
+  </header>
+
+  <section id="how">
+    <h2>Why Goji</h2>
+    <div class="features">
+      <div class="feature">
+        <h3>Nothing leaves your Mac</h3>
+        <p>Speech is transcribed on-device with Parakeet v3. No cloud, no accounts, no telemetry.</p>
+      </div>
+      <div class="feature">
+        <h3>Fast enough to feel instant</h3>
+        <p>Runs on the Apple Neural Engine. A short utterance lands as text about a second after you let go.</p>
+      </div>
+      <div class="feature">
+        <h3>Works everywhere you type</h3>
+        <p>Pastes into Slack, Chrome, Notes, Xcode, anything. Your clipboard is put back afterward.</p>
+      </div>
+      <div class="feature">
+        <h3>Yours to shape</h3>
+        <p>Hold or toggle, pick your shortcut, notch or panel HUD, word replacements, and local history.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="releases">
+    <h2>Release history</h2>
+
+    <!-- RELEASES: add the newest release block directly below this line -->
+
+    <article class="release">
+      <div><span class="ver">v0.1.0</span><span class="date">July 5, 2026</span></div>
+      <p class="lead">First release. The core loop, a lean settings window, and enough polish to use every day.</p>
+      <ul>
+        <li>Hold Right Option, speak, release. Transcript pastes into the frontmost app.</li>
+        <li>Fully on-device transcription with Parakeet v3. Nothing leaves your Mac.</li>
+        <li>Menu bar app with an optional Dock icon. Hold or Toggle mode, Esc cancels.</li>
+        <li>Notch or panel recording HUD with a live waveform.</li>
+        <li>Word replacements, local transcript history, and start and stop sound cues.</li>
+        <li>Optional on-device AI cleanup on macOS 26 with Apple Intelligence.</li>
+        <li>Microphone picker with a live test meter.</li>
+        <li>Reliability: survives sleep, wake, and mic changes, and preserves your existing clipboard.</li>
+      </ul>
+    </article>
+
+  </section>
+
+  <footer>
+    <p>Built by <a href="https://github.com/brendanrong">Brendan Rong</a>. On-device and private by design. Open dependencies only.</p>
+  </footer>
+
+</div>
+</body>
+</html>
