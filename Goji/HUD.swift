@@ -2,7 +2,8 @@ import AppKit
 import SwiftUI
 
 /// Floating recording indicator. Two styles: a capsule panel at the bottom of the
-/// screen, or a notch extension on Macs with a notch (top-pill fallback elsewhere).
+/// screen, or a notch extension (a synthetic notch island on displays without a
+/// real cutout, so the design stays consistent on external monitors).
 /// Non-activating panel so focus stays in the app being dictated into.
 @MainActor
 final class HUDController {
@@ -13,9 +14,16 @@ final class HUDController {
 
     private enum Placement: Equatable {
         case bottomPanel
-        case topPill
+        /// Physical notch cutout: wings hug the real notch.
         case notch(NSRect)
+        /// No hardware notch (external monitor, older Mac): draw a fake notch
+        /// island at MacBook proportions so the design stays consistent.
+        case syntheticNotch
     }
+
+    /// Fake cutout dimensions for notchless displays, roughly MacBook Pro
+    /// proportions. The island hangs from the top edge, Willow style.
+    private static let syntheticNotchSize = NSSize(width: 170, height: 34)
 
     private var panel: NSPanel?
     private var currentPlacement: Placement?
@@ -57,7 +65,7 @@ final class HUDController {
             if let notch = NSScreen.main?.notchArea {
                 return .notch(notch)
             }
-            return .topPill
+            return .syntheticNotch
         }
     }
 
@@ -67,7 +75,7 @@ final class HUDController {
 
         let newPanel: NSPanel
         switch placement {
-        case .bottomPanel, .topPill:
+        case .bottomPanel:
             newPanel = makePanel(size: NSSize(width: 180, height: 44))
             newPanel.level = .statusBar
             newPanel.contentView = NSHostingView(rootView: PanelHUDView(model: model))
@@ -77,6 +85,12 @@ final class HUDController {
             newPanel = makePanel(size: NSSize(width: notch.width + 120, height: notch.height))
             newPanel.level = .screenSaver
             newPanel.contentView = NSHostingView(rootView: NotchHUDView(model: model, notchWidth: notch.width))
+        case .syntheticNotch:
+            // Same view, fake cutout: black island top-center over the menu bar.
+            let fake = Self.syntheticNotchSize
+            newPanel = makePanel(size: NSSize(width: fake.width + 120, height: fake.height))
+            newPanel.level = .screenSaver
+            newPanel.contentView = NSHostingView(rootView: NotchHUDView(model: model, notchWidth: fake.width))
         }
 
         position(newPanel, placement: placement)
@@ -106,10 +120,7 @@ final class HUDController {
         case .bottomPanel:
             let frame = screen.visibleFrame
             panel.setFrameOrigin(NSPoint(x: frame.midX - size.width / 2, y: frame.minY + 60))
-        case .topPill:
-            let frame = screen.visibleFrame
-            panel.setFrameOrigin(NSPoint(x: frame.midX - size.width / 2, y: frame.maxY - size.height - 12))
-        case .notch:
+        case .notch, .syntheticNotch:
             let frame = screen.frame
             panel.setFrameOrigin(NSPoint(x: frame.midX - size.width / 2, y: frame.maxY - size.height))
         }

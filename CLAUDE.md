@@ -21,7 +21,7 @@ Read PRD.md for scope. v1 is the core loop plus a lean settings window. Don't go
 - `AudioRecorder.swift`: AVAudioEngine tap, converts to 16 kHz mono Float32.
 - `Transcriber.swift`: FluidAudio AsrManager wrapper (actor).
 - `TextInserter.swift`: pasteboard swap + synthetic Cmd+V, restores clipboard after 1 s (Electron paste handlers read it late).
-- `HUD.swift`: HUDController, places the indicator (bottom panel, notch extension, or top pill fallback).
+- `HUD.swift`: HUDController, places the indicator (bottom panel, notch extension; synthetic notch island on notchless displays).
 - `HUDViews.swift`: the SwiftUI indicator views (capsule + notch shapes).
 - `SettingsStore.swift`: user prefs (hotkey, hold/toggle, HUD style, login item, replacements). UserDefaults-backed, applied live, no restart needed.
 - `SettingsView.swift`: settings shell — sidebar navigation (General/Microphone/Transcription/History/About) + detail pane.

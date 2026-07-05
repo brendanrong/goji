@@ -35,7 +35,7 @@ struct WaveformBars: View {
     }
 }
 
-/// Floating capsule, used for the bottom panel and the no-notch top pill fallback.
+/// Floating capsule, used for the bottom panel style.
 struct PanelHUDView: View {
     @ObservedObject var model: HUDModel
 
