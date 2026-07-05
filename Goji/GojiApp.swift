@@ -6,15 +6,29 @@ struct GojiApp: App {
     @ObservedObject private var settings = SettingsStore.shared
 
     var body: some Scene {
-        MenuBarExtra(isInserted: $settings.showInMenuBar) {
+        // No Settings scene: openSettings()/SettingsLink silently no-op for
+        // menu-bar-only apps on macOS 26. SettingsWindow manages it instead.
+        MenuBarExtra(isInserted: dedupedShowInMenuBar) {
             MenuContent(state: delegate.state, controller: delegate.controller)
         } label: {
             MenuBarLabel(state: delegate.state)
         }
+    }
 
-        Settings {
-            SettingsView()
-        }
+    /// MenuBarExtra writes `isInserted` back on every scene update (KVO on the
+    /// status item), even when the value hasn't changed. Feeding that straight
+    /// into the @Published property fires objectWillChange -> App body re-eval
+    /// -> MenuBarExtra update -> write again: an infinite invalidation loop
+    /// that pegs the main thread (confirmed via sample). Dedupe before writing.
+    private var dedupedShowInMenuBar: Binding<Bool> {
+        Binding(
+            get: { settings.showInMenuBar },
+            set: { newValue in
+                if settings.showInMenuBar != newValue {
+                    settings.showInMenuBar = newValue
+                }
+            }
+        )
     }
 }
 
@@ -25,12 +39,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         SettingsStore.shared.applyDockPolicy()
-        controller.start()
+        // Defer off the launch render pass. start() mutates @Published AppState, and
+        // doing that synchronously here lands mid first-render -> SwiftUI's
+        // "Publishing changes from within view updates" warning.
+        DispatchQueue.main.async { [weak self] in
+            self?.controller.start()
+        }
     }
 
     /// Escape hatch: relaunching Goji from Spotlight/Finder restores a hidden menu bar icon.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        SettingsStore.shared.showInMenuBar = true
+        if !SettingsStore.shared.showInMenuBar {
+            SettingsStore.shared.showInMenuBar = true
+        }
         return true
     }
 }
