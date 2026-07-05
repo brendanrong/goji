@@ -139,9 +139,8 @@ struct TranscriptionPane: View {
                         .disabled(!Cleaner.isSupported)
                 }
             }
-            CaptionText(Cleaner.isSupported
-                ? "Removes filler words, applies self-corrections like 'scratch that', and turns 'new line' into a real line break. Runs entirely on this Mac."
-                : "Needs macOS 26 with Apple Intelligence enabled on this Mac.")
+            CaptionText(Cleaner.unavailabilityHint
+                ?? "Removes filler words, applies self-corrections like 'scratch that', and turns 'new line' into a real line break. Runs entirely on this Mac.")
 
             SectionHeader("Word replacements")
             SettingsCard {
