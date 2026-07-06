@@ -442,6 +442,10 @@ struct AboutPane: View {
                     }
                 }
                 .padding(.vertical, 12)
+                .onAppear {
+                    // Re-check whenever About opens, not just at launch.
+                    Task { await updates.check() }
+                }
                 Divider()
                 SettingsRow("Updates", subtitle: updateStatus) {
                     if updates.availableVersion != nil {
@@ -485,7 +489,10 @@ struct AboutPane: View {
         if let available = updates.availableVersion {
             return "Goji \(available) is ready to download. You're on \(UpdateChecker.currentVersion)."
         }
-        return "You're on the latest version."
+        if updates.lastCheckFailed {
+            return "Couldn't reach GitHub to check. Try again in a moment."
+        }
+        return "You're on the latest version (\(UpdateChecker.currentVersion))."
     }
 }
 
