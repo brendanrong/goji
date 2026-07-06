@@ -305,7 +305,7 @@ final class SettingsStore: ObservableObject {
             customHotkey = nil
         }
         activationMode = ActivationMode(rawValue: d.string(forKey: Keys.activationMode) ?? "") ?? .hold
-        hudStyle = HUDStyle(rawValue: d.string(forKey: Keys.hudStyle) ?? "") ?? .panel
+        hudStyle = HUDStyle(rawValue: d.string(forKey: Keys.hudStyle) ?? "") ?? .notch
         appearance = AppearanceMode(rawValue: d.string(forKey: Keys.appearance) ?? "") ?? .system
         launchAtLogin = SMAppService.mainApp.status == .enabled
         showInMenuBar = (d.object(forKey: Keys.showInMenuBar) as? Bool) ?? true
