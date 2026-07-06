@@ -577,6 +577,7 @@ struct TagBadge: View {
 struct HistoryPane: View {
     @ObservedObject private var history = HistoryStore.shared
     @ObservedObject private var settings = SettingsStore.shared
+    @ObservedObject private var stats = StatsStore.shared
     @State private var expandedID: UUID?
     @State private var selection: ClosedRange<Int>?
     @State private var replaceWith = ""
@@ -585,6 +586,14 @@ struct HistoryPane: View {
 
     var body: some View {
         PaneScaffold(title: "History", subtitle: "Recent transcripts, stored only on this Mac") {
+            if stats.totalWords > 0 {
+                HStack(spacing: 12) {
+                    statTile("Dictated words", stats.totalWords.formatted())
+                    statTile("Time saved", "\(stats.minutesSaved) min")
+                    statTile("Day streak", "\(stats.streakDays)")
+                    statTile("Average speed", stats.averageWPM > 0 ? "\(stats.averageWPM) wpm" : "–")
+                }
+            }
             if history.items.isEmpty {
                 SettingsCard {
                     Text("No transcripts yet.")
@@ -732,6 +741,19 @@ struct HistoryPane: View {
         expandedID = nil
         selection = nil
         replaceWith = ""
+    }
+
+    private func statTile(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.title3.bold())
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 10).fill(.quinary))
     }
 }
 

@@ -326,6 +326,10 @@ final class DictationController {
 
                 state.lastTranscript = cleaned
                 history.add(cleaned)
+                StatsStore.shared.record(
+                    words: cleaned.split(whereSeparator: \.isWhitespace).count,
+                    seconds: Double(samples.count) / AudioRecorder.sampleRate
+                )
                 refreshAccessibility()
                 inserter.insert(cleaned + " ")
             } catch {
