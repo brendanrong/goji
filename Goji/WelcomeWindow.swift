@@ -47,6 +47,10 @@ final class WelcomeWindow: NSObject, NSWindowDelegate {
         NSApp.activate(ignoringOtherApps: true)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [self] in
             window?.makeKeyAndOrderFront(nil)
+            // macOS 26's cooperative activation can deny the activate() above
+            // (busy desktop, scripted launch), leaving the first-run window
+            // buried where a new user never finds it. Force it visible.
+            window?.orderFrontRegardless()
         }
     }
 
