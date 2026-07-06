@@ -35,7 +35,8 @@ Read PRD.md for scope. v1 is the core loop plus a lean settings window. Don't go
 - `MicDevices.swift`: CoreAudio input-device listing + UID resolution for the mic picker.
 - `Cleaner.swift`: optional on-device AI cleanup (Apple Foundation Models, macOS 26+). Returns raw text on any failure.
 - `Sounds.swift`: start/stop cues (system sounds, low volume).
-- `SystemAudio.swift`: CoreAudio mute/restore of the default output while dictating (optional, off by default).
+- `SystemAudio.swift`: CoreAudio mute/restore of the default output + outputIsActive() check (HDMI/DP monitors often expose no mute or volume control, so mute alone can't be relied on).
+- `MediaKeys.swift`: synthetic play/pause media key (F8). Pauses/resumes whatever owns Now Playing while dictating; only sent when audio is flowing because it's a blind toggle.
 - `Permissions.swift`: mic + Accessibility helpers.
 - `MenuContent.swift`: the status bar menu (paste last, settings, permissions, quit).
 

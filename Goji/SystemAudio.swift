@@ -37,6 +37,23 @@ enum SystemAudio {
         }
     }
 
+    /// True when any app is currently playing audio through the default
+    /// output. Gates the media-key pause so it can't START playback that
+    /// wasn't running.
+    static func outputIsActive() -> Bool {
+        guard let device = defaultOutputDevice() else { return false }
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceIsRunningSomewhere,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        guard AudioObjectHasProperty(device, &address) else { return false }
+        var running: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, &running) == noErr else { return false }
+        return running != 0
+    }
+
     /// No-op unless muteOutput actually changed something.
     static func restoreOutput() {
         guard let s = saved else { return }

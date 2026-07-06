@@ -29,6 +29,9 @@ final class DictationController {
         settings.activationMode == .hold && settings.doubleTapLock
     }
 
+    /// True when we sent play/pause at recording start, so we resume after.
+    private var pausedMedia = false
+
     init(state: AppState) {
         self.state = state
     }
@@ -189,6 +192,12 @@ final class DictationController {
         DispatchQueue.main.asyncAfter(deadline: .now() + doubleTapWindow, execute: work)
     }
 
+    private func resumeMediaIfPaused() {
+        guard pausedMedia else { return }
+        pausedMedia = false
+        MediaKeys.playPause()
+    }
+
     private func resetLockState() {
         locked = false
         pressStartedAt = nil
@@ -202,7 +211,15 @@ final class DictationController {
         state.lastError = nil
         do {
             try recorder.start(deviceUID: settings.micDeviceUID)
-            if settings.muteWhileDictating {
+            if settings.pauseMediaWhileDictating {
+                // Pause the source (works on any output device), and mute the
+                // device too where it has a control. Only pause when audio is
+                // actually flowing: play/pause is a toggle and would otherwise
+                // START playback.
+                if SystemAudio.outputIsActive() {
+                    MediaKeys.playPause()
+                    pausedMedia = true
+                }
                 SystemAudio.muteOutput()
             }
             state.phase = .recording
@@ -222,6 +239,7 @@ final class DictationController {
         escape.disarm()
         let samples = recorder.stop()
         SystemAudio.restoreOutput()
+        resumeMediaIfPaused()
 
         guard samples.count >= minimumSamples else {
             state.phase = .idle
@@ -267,6 +285,7 @@ final class DictationController {
         escape.disarm()
         _ = recorder.stop()
         SystemAudio.restoreOutput()
+        resumeMediaIfPaused()
         state.phase = .idle
         hud.hide()
     }
