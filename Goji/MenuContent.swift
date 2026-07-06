@@ -58,6 +58,7 @@ struct MenuContent: View {
                 Button("Re-check permissions") {
                     controller.refreshAccessibility(prompt: true)
                 }
+                Text("Toggle already on but pasting fails? Remove Goji from the list, then add it back.")
             }
 
             if state.modelState == .needsDownload {

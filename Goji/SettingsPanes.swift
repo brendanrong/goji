@@ -460,68 +460,61 @@ struct AboutPane: View {
 
     var body: some View {
         PaneScaffold(title: "About", subtitle: "Version info and support") {
-            VStack(spacing: 18) {
-                VStack(spacing: 3) {
-                    Image(nsImage: NSApp.applicationIconImage)
-                        .resizable()
-                        .frame(width: 96, height: 96)
-                        .padding(.bottom, 6)
+            HStack(alignment: .center, spacing: 14) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 72, height: 72)
+                VStack(alignment: .leading, spacing: 2) {
                     Text("Goji")
-                        .font(.title.bold())
+                        .font(.title2.bold())
                     Text(version)
                         .foregroundStyle(.secondary)
                     Text("Local, private dictation for macOS")
                         .foregroundStyle(.secondary)
                 }
-
-                Text("Hold a key, talk, release, and your words paste where your cursor is. Speech is transcribed entirely on this Mac.")
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: 420)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                VStack(alignment: .leading, spacing: 7) {
-                    HStack(spacing: 7) {
-                        Image(systemName: "checkmark.seal.fill")
-                            .foregroundStyle(.green)
-                        Text("Signed and notarized by Apple")
-                    }
-                    HStack(spacing: 7) {
-                        Image(systemName: "lock.fill")
-                            .foregroundStyle(Color.accentColor)
-                        Text("No cloud, no account, no telemetry. Free forever.")
-                    }
-                }
-                .font(.callout)
-
-                Text("Built by Brendan Rong.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-
-                VStack(spacing: 10) {
-                    HStack(spacing: 10) {
-                        updatesControl
-                        Button {
-                            NSWorkspace.shared.open(URL(string: "https://github.com/brendanrong/goji/issues")!)
-                        } label: {
-                            Label("Report a Problem", systemImage: "envelope")
-                        }
-                    }
-                    Text(updateStatus)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                    Toggle("Check for updates automatically", isOn: $settings.autoCheckUpdates)
-                        .toggleStyle(.checkbox)
-                        .font(.caption)
-                }
             }
-            .frame(maxWidth: .infinity)
-            .padding(.top, 10)
             .onAppear {
                 // Re-check whenever About opens, not just at launch.
                 Task { await updates.check() }
             }
+
+            Text("Hold a key, talk, release, and your words paste where your cursor is. Speech is transcribed entirely on this Mac.")
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: 460, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(spacing: 7) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .foregroundStyle(.green)
+                    Text("Signed and notarized by Apple")
+                }
+                HStack(spacing: 7) {
+                    Image(systemName: "lock.fill")
+                        .foregroundStyle(Color.accentColor)
+                    Text("No cloud, no account, no telemetry. Free forever.")
+                }
+            }
+            .font(.callout)
+
+            Text("Built by Brendan Rong.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 10) {
+                updatesControl
+                Button {
+                    NSWorkspace.shared.open(URL(string: "https://github.com/brendanrong/goji/issues")!)
+                } label: {
+                    Label("Report a Problem", systemImage: "envelope")
+                }
+            }
+            Text(updateStatus)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Toggle("Check for updates automatically", isOn: $settings.autoCheckUpdates)
+                .toggleStyle(.checkbox)
+                .font(.caption)
         }
     }
 
