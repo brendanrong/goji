@@ -36,15 +36,22 @@ struct GeneralPane: View {
                     .labelsHidden()
                     .fixedSize()
                 }
+            }
+            CaptionText(modeHint)
+
+            SectionHeader("Microphone")
+            MicrophoneSection()
+
+            SectionHeader("Fine-tuning")
+            SettingsCard {
                 if settings.activationMode == .hold {
-                    Divider()
                     SettingsRow("Double-tap to lock recording",
                                 subtitle: "Tap twice quickly to keep recording hands-free, tap again to finish.") {
                         Toggle("Double-tap to lock recording", isOn: $settings.doubleTapLock)
                             .labelsHidden()
                     }
+                    Divider()
                 }
-                Divider()
                 SettingsRow("Play start/stop sounds",
                             subtitle: "Cues when recording begins and ends, in the pack of your choice.") {
                     HStack(spacing: 10) {
@@ -72,7 +79,6 @@ struct GeneralPane: View {
                     .fixedSize()
                 }
             }
-            CaptionText(modeHint)
 
             SectionHeader("System")
             SettingsCard {
@@ -157,37 +163,36 @@ enum HotkeyChoice: Hashable {
     case custom
 }
 
-struct MicrophonePane: View {
+/// Mic picker + live level test, embedded in General.
+struct MicrophoneSection: View {
     @ObservedObject private var settings = SettingsStore.shared
     @State private var devices: [MicDevices.Device] = []
     @StateObject private var micPreview = MicLevelPreview()
 
     var body: some View {
-        PaneScaffold(title: "Microphone", subtitle: "Input device for dictation") {
-            SettingsCard {
-                SettingsRow("Input device",
-                            subtitle: "Used from the next recording. Falls back to the system default if unavailable.") {
-                    Picker("Input device", selection: $settings.micDeviceUID) {
-                        Text("System default").tag(String?.none)
-                        ForEach(devices) { device in
-                            Text(device.name).tag(String?.some(device.uid))
-                        }
-                        if let saved = settings.micDeviceUID, !devices.contains(where: { $0.uid == saved }) {
-                            Text("Saved device (unavailable)").tag(String?.some(saved))
-                        }
+        SettingsCard {
+            SettingsRow("Input device",
+                        subtitle: "Used from the next recording. Falls back to the system default if unavailable.") {
+                Picker("Input device", selection: $settings.micDeviceUID) {
+                    Text("System default").tag(String?.none)
+                    ForEach(devices) { device in
+                        Text(device.name).tag(String?.some(device.uid))
                     }
-                    .labelsHidden()
-                    .fixedSize()
+                    if let saved = settings.micDeviceUID, !devices.contains(where: { $0.uid == saved }) {
+                        Text("Saved device (unavailable)").tag(String?.some(saved))
+                    }
                 }
-                Divider()
-                SettingsRow(micPreview.running ? "Listening…" : "Check your input level") {
-                    HStack(spacing: 12) {
-                        if micPreview.running {
-                            WaveformBars(level: micPreview.level, color: .green, barCount: 18, maxHeight: 14)
-                        }
-                        Button(micPreview.running ? "Stop Test" : "Test Mic") {
-                            micPreview.toggle(deviceUID: settings.micDeviceUID)
-                        }
+                .labelsHidden()
+                .fixedSize()
+            }
+            Divider()
+            SettingsRow(micPreview.running ? "Listening…" : "Check your input level") {
+                HStack(spacing: 12) {
+                    if micPreview.running {
+                        WaveformBars(level: micPreview.level, color: .green, barCount: 18, maxHeight: 14)
+                    }
+                    Button(micPreview.running ? "Stop Test" : "Test Mic") {
+                        micPreview.toggle(deviceUID: settings.micDeviceUID)
                     }
                 }
             }
@@ -218,6 +223,32 @@ struct TranscriptionPane: View {
             }
             CaptionText(Cleaner.unavailabilityHint
                 ?? "Removes filler words, applies self-corrections like 'scratch that', and turns 'new line' into a real line break. Runs entirely on this Mac.")
+
+            SectionHeader("Names & phrases")
+            SettingsCard {
+                ForEach($settings.vocabulary) { $word in
+                    HStack {
+                        TextField("Name, team, or term", text: $word.text)
+                            .textFieldStyle(.roundedBorder)
+                        Button {
+                            settings.vocabulary.removeAll { $0.id == word.id }
+                        } label: {
+                            Image(systemName: "minus.circle.fill")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                    .padding(.vertical, 6)
+                    Divider()
+                }
+                SettingsRow("Words Goji keeps mishearing",
+                            subtitle: "Add each one once: people, teams, product names, jargon.") {
+                    Button("Add Word") {
+                        settings.vocabulary.append(VocabWord())
+                    }
+                }
+            }
+            CaptionText("AI cleanup nudges close mishearings to these exact spellings ('Jaken' becomes 'Jachin'). Needs the cleanup toggle on. One entry here replaces a pile of replacement rules.")
 
             SectionHeader("Formatting")
             SettingsCard {

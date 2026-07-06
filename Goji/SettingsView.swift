@@ -6,7 +6,6 @@ import SwiftUI
 struct SettingsView: View {
     enum Pane: String, CaseIterable, Identifiable {
         case general
-        case microphone
         case transcription
         case models
         case history
@@ -17,7 +16,6 @@ struct SettingsView: View {
         var label: String {
             switch self {
             case .general: return "General"
-            case .microphone: return "Microphone"
             case .transcription: return "Transcription"
             case .models: return "Models"
             case .history: return "History"
@@ -28,7 +26,6 @@ struct SettingsView: View {
         var icon: String {
             switch self {
             case .general: return "gearshape"
-            case .microphone: return "mic"
             case .transcription: return "wand.and.stars"
             case .models: return "cpu"
             case .history: return "clock"
@@ -76,7 +73,6 @@ struct SettingsView: View {
         Group {
             switch pane {
             case .general: GeneralPane()
-            case .microphone: MicrophonePane()
             case .transcription: TranscriptionPane()
             case .models: ModelsPane()
             case .history: HistoryPane()
