@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct GeneralPane: View {
     @ObservedObject private var settings = SettingsStore.shared
@@ -222,6 +223,7 @@ struct MicrophoneSection: View {
 
 struct TranscriptionPane: View {
     @ObservedObject private var settings = SettingsStore.shared
+    @State private var packStatus: String?
 
     var body: some View {
         PaneScaffold(title: "Transcription", subtitle: "What happens to your words, in order") {
@@ -297,8 +299,55 @@ struct TranscriptionPane: View {
                         settings.replacements.append(ReplacementRule())
                     }
                 }
+                Divider()
+                SettingsRow("Share or back up",
+                            subtitle: "Your rules and Names & phrases as one JSON file. Import merges and never deletes.") {
+                    HStack(spacing: 8) {
+                        Button("Import…") {
+                            importPack()
+                        }
+                        Button("Export…") {
+                            exportPack()
+                        }
+                    }
+                }
+            }
+            if let packStatus {
+                Text(packStatus)
+                    .font(.caption)
+                    .foregroundStyle(Color.accentColor)
             }
             CaptionText("Literal find and replace, applied last. Case-insensitive, whole words. For name fixes, prefer Names & phrases at the top.")
+        }
+    }
+
+    private func importPack() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let pack = try JSONDecoder().decode(WordPack.self, from: Data(contentsOf: url))
+            let result = settings.merge(pack)
+            let name = pack.name ?? url.deletingPathExtension().lastPathComponent
+            packStatus = "Imported \"\(name)\": added \(result.rules) rules and \(result.words) words, skipped \(result.skipped) duplicates."
+        } catch {
+            packStatus = "Couldn't read that file as a word pack."
+        }
+    }
+
+    private func exportPack() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = "goji-words.json"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        do {
+            try encoder.encode(settings.exportPack()).write(to: url)
+            packStatus = "Exported \(settings.replacements.count) rules and \(settings.vocabularyTerms.count) words."
+        } catch {
+            packStatus = "Export failed: \(error.localizedDescription)"
         }
     }
 
