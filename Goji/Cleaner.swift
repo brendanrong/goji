@@ -77,8 +77,11 @@ actor FoundationCleaner {
             \nThe speaker's vocabulary includes these exact names and terms: \
             \(vocabulary.joined(separator: ", ")). \
             When a word in the transcript is a close mishearing of one of them, \
-            replace it with the exact listed spelling. Do not change words that \
-            are not close matches.
+            replace it with the exact listed spelling. Rules for this: \
+            a word that already exactly matches one of the terms must stay \
+            exactly as it is; when replacing, choose the term that sounds most \
+            similar to the original word, never a different term from the list; \
+            do not change words that are not close matches to any term.
             """
     }
 
