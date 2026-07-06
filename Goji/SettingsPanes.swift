@@ -39,26 +39,23 @@ struct GeneralPane: View {
             }
             CaptionText(modeHint)
 
-            SectionHeader("Recording display")
-            SettingsCard {
-                HStack(spacing: 14) {
-                    HUDStyleCard(style: .panel, selected: settings.hudStyle == .panel) {
-                        settings.hudStyle = .panel
-                    }
-                    HUDStyleCard(style: .notch, selected: settings.hudStyle == .notch) {
-                        settings.hudStyle = .notch
-                    }
-                    Spacer(minLength: 0)
-                }
-                .padding(.vertical, 12)
-            }
-            CaptionText("Where the listening indicator appears while you dictate. Notch blends into the camera housing on MacBooks and draws its own island on external displays.")
-
             SectionHeader("Microphone")
             MicrophoneSection()
 
             SectionHeader("Fine-tuning")
             SettingsCard {
+                SettingsRow("Recording display",
+                            subtitle: "Notch blends into the camera housing on MacBooks and draws its own island on external displays.") {
+                    Picker("Recording display", selection: $settings.hudStyle) {
+                        ForEach(HUDStyle.allCases) { style in
+                            Text(style.label).tag(style)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
+                }
+                Divider()
                 if settings.activationMode == .hold {
                     SettingsRow("Double-tap to lock recording",
                                 subtitle: "Tap twice quickly to keep recording hands-free, tap again to finish.") {
@@ -587,77 +584,6 @@ struct AboutPane: View {
             return "Couldn't reach GitHub to check. Try again in a moment."
         }
         return "You're on the latest version (\(UpdateChecker.currentVersion))."
-    }
-}
-
-/// Spokenly-style preview card for a recording display option: a miniature
-/// screen showing where the indicator lives, with a selection ring.
-struct HUDStyleCard: View {
-    let style: HUDStyle
-    let selected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 6) {
-                preview
-                    .frame(width: 150, height: 92)
-                    .clipShape(RoundedRectangle(cornerRadius: 9))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 9)
-                            .strokeBorder(selected ? Color.accentColor : Color.primary.opacity(0.12),
-                                          lineWidth: selected ? 2.5 : 1)
-                    )
-                Text(style.label)
-                    .font(.callout)
-                    .foregroundStyle(selected ? Color.accentColor : Color.secondary)
-            }
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var preview: some View {
-        ZStack {
-            LinearGradient(
-                colors: [Color(red: 0.95, green: 0.91, blue: 0.97), Color(red: 0.70, green: 0.71, blue: 0.94)],
-                startPoint: .top, endPoint: .bottom
-            )
-            if style == .notch {
-                VStack(spacing: 0) {
-                    ZStack(alignment: .top) {
-                        Rectangle()
-                            .fill(.black)
-                            .frame(height: 12)
-                        UnevenRoundedRectangle(cornerRadii: .init(bottomLeading: 5, bottomTrailing: 5))
-                            .fill(.black)
-                            .frame(width: 72, height: 18)
-                            .overlay(miniWave(color: .white, scale: 0.7).offset(x: 18, y: 2))
-                    }
-                    Spacer()
-                }
-            } else {
-                VStack {
-                    Spacer()
-                    Capsule()
-                        .fill(.white)
-                        .frame(width: 88, height: 22)
-                        .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
-                        .overlay(miniWave(color: .secondary, scale: 1))
-                        .padding(.bottom, 10)
-                }
-            }
-        }
-    }
-
-    private func miniWave(color: Color, scale: CGFloat) -> some View {
-        let heights: [CGFloat] = [4, 7, 5, 10, 6, 11, 5, 8, 4, 9, 6, 5]
-        return HStack(spacing: 1.6) {
-            ForEach(0..<heights.count, id: \.self) { index in
-                Capsule()
-                    .fill(color)
-                    .frame(width: 1.7, height: heights[index] * scale)
-            }
-        }
     }
 }
 
