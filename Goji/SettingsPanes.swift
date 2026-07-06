@@ -30,14 +30,22 @@ struct GeneralPane: View {
                 }
                 if settings.activationMode == .hold {
                     Divider()
-                    SettingsRow("Double-tap to lock recording") {
+                    SettingsRow("Double-tap to lock recording",
+                                subtitle: "Tap twice quickly to keep recording hands-free, tap again to finish.") {
                         Toggle("Double-tap to lock recording", isOn: $settings.doubleTapLock)
                             .labelsHidden()
                     }
                 }
                 Divider()
-                SettingsRow("Play start/stop sounds") {
+                SettingsRow("Play start/stop sounds",
+                            subtitle: "Soft cues when recording begins and ends.") {
                     Toggle("Play start/stop sounds", isOn: $settings.playSounds)
+                        .labelsHidden()
+                }
+                Divider()
+                SettingsRow("Mute other audio while dictating",
+                            subtitle: "Silences your speakers during recording so music doesn't bleed into the mic.") {
+                    Toggle("Mute other audio while dictating", isOn: $settings.muteWhileDictating)
                         .labelsHidden()
                 }
             }
@@ -45,17 +53,20 @@ struct GeneralPane: View {
 
             SectionHeader("System")
             SettingsCard {
-                SettingsRow("Launch at login") {
+                SettingsRow("Launch at login",
+                            subtitle: "Open Goji automatically when you log in.") {
                     Toggle("Launch at login", isOn: $settings.launchAtLogin)
                         .labelsHidden()
                 }
                 Divider()
-                SettingsRow("Show in menu bar") {
+                SettingsRow("Show in menu bar",
+                            subtitle: "The berry icon in the status bar.") {
                     Toggle("Show in menu bar", isOn: $settings.showInMenuBar)
                         .labelsHidden()
                 }
                 Divider()
-                SettingsRow("Show in Dock") {
+                SettingsRow("Show in Dock",
+                            subtitle: "Clicking the Dock icon opens Settings.") {
                     Toggle("Show in Dock", isOn: $settings.showInDock)
                         .labelsHidden()
                 }
@@ -88,7 +99,8 @@ struct MicrophonePane: View {
     var body: some View {
         PaneScaffold(title: "Microphone", subtitle: "Input device for dictation") {
             SettingsCard {
-                SettingsRow("Input device") {
+                SettingsRow("Input device",
+                            subtitle: "Used from the next recording. Falls back to the system default if unavailable.") {
                     Picker("Input device", selection: $settings.micDeviceUID) {
                         Text("System default").tag(String?.none)
                         ForEach(devices) { device in
@@ -113,7 +125,6 @@ struct MicrophonePane: View {
                     }
                 }
             }
-            CaptionText("Used from the next recording. Falls back to the system default if unavailable.")
         }
         .onAppear { devices = MicDevices.inputDevices() }
         .onDisappear { micPreview.stop() }
@@ -232,13 +243,25 @@ struct AboutPane: View {
                 }
                 .padding(.vertical, 12)
                 Divider()
-                SettingsRow("Enjoying Goji?") {
+                SettingsRow("Private by design",
+                            subtitle: "Audio, transcripts, and settings never leave this Mac. No account, no telemetry, free forever.") {
+                    EmptyView()
+                }
+                Divider()
+                SettingsRow("Something broken?",
+                            subtitle: "Open an issue on GitHub and I'll take a look.") {
+                    Button("Report a Problem") {
+                        NSWorkspace.shared.open(URL(string: "https://github.com/brendanrong/goji/issues")!)
+                    }
+                }
+                Divider()
+                SettingsRow("Enjoying Goji?",
+                            subtitle: "Goji is free. If it saves you time, a coffee keeps it going.") {
                     Button("Buy Me a Coffee") {
                         NSWorkspace.shared.open(URL(string: "https://ko-fi.com/livewall")!)
                     }
                 }
             }
-            CaptionText("Everything runs on this Mac. Audio, transcripts, and settings never leave it.")
         }
     }
 

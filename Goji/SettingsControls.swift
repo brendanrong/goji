@@ -60,19 +60,30 @@ struct SettingsCard<Content: View>: View {
     }
 }
 
-/// One "label left, control right" row inside a card.
+/// One "label left, control right" row inside a card, with an optional
+/// Willow-style description line under the label.
 struct SettingsRow<Control: View>: View {
     let label: String
+    let subtitle: String?
     @ViewBuilder var control: Control
 
-    init(_ label: String, @ViewBuilder control: () -> Control) {
+    init(_ label: String, subtitle: String? = nil, @ViewBuilder control: () -> Control) {
         self.label = label
+        self.subtitle = subtitle
         self.control = control()
     }
 
     var body: some View {
-        HStack {
-            Text(label)
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
             Spacer()
             control
         }
