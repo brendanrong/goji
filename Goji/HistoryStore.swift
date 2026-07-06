@@ -36,12 +36,6 @@ final class HistoryStore: ObservableObject {
         persist()
     }
 
-    func update(_ id: UUID, text: String) {
-        guard let index = items.firstIndex(where: { $0.id == id }) else { return }
-        items[index].text = text
-        persist()
-    }
-
     func clear() {
         items = []
         persist()
