@@ -180,6 +180,9 @@ final class DictationController {
         state.lastError = nil
         do {
             try recorder.start(deviceUID: settings.micDeviceUID)
+            if settings.muteWhileDictating {
+                SystemAudio.muteOutput()
+            }
             state.phase = .recording
             escape.arm()
             hud.show(.listening, style: settings.hudStyle)
@@ -196,6 +199,7 @@ final class DictationController {
         resetLockState()
         escape.disarm()
         let samples = recorder.stop()
+        SystemAudio.restoreOutput()
 
         guard samples.count >= minimumSamples else {
             state.phase = .idle
@@ -240,6 +244,7 @@ final class DictationController {
         resetLockState()
         escape.disarm()
         _ = recorder.stop()
+        SystemAudio.restoreOutput()
         state.phase = .idle
         hud.hide()
     }
