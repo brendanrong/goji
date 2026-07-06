@@ -10,12 +10,10 @@ actor Transcriber {
     private var loadedModel: SpeechModel?
 
     // NOTE: A decoder-level "Enhanced recognition" boost (CTC word spotting +
-    // rescoring) was built and parked here in v1.0.15 development: the
-    // library's batch rescorer misaligned replacements onto neighboring
-    // words, and the replacement approaches missed true positives. Names &
-    // phrases corrections run through the AI cleanup prompt instead (with
-    // learned aliases from History fixes). Revisit only with an offline test
-    // harness of recorded audio; see git history around v1.0.15.
+    // rescoring) and a fix-and-learn loop were built and removed during
+    // v1.0.15 development; see the gotcha in CLAUDE.md. Names & phrases
+    // corrections run through the AI cleanup prompt only. Revisit learning
+    // only with an offline test harness of recorded audio (git history).
 
     /// True when the given model needs no download: bundled inside the app
     /// (default model only) or already in the FluidAudio cache.
