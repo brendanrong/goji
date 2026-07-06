@@ -1,24 +1,39 @@
 import AppKit
 
 /// Subtle audio cues so you know recording state without looking at the HUD.
-/// Custom minimal blips (soft sine pairs, bundled WAVs): rising for start,
-/// falling for stop. System sounds like Pop/Tink read as glitchy when a short
-/// dictation fires both within a second.
+/// Three packs: Minimal (soft sine blips), Wood (marimba-ish taps), Classic
+/// (the macOS Pop/Tink system sounds). Rising pair for start, falling for stop.
+@MainActor
 enum Sounds {
-    private static let start = bundled("RecordStart") ?? NSSound(named: "Pop")
-    private static let stop = bundled("RecordStop") ?? NSSound(named: "Tink")
+    private static var cache: [String: NSSound] = [:]
 
     static func recordingStarted() {
-        play(start, volume: 0.6)
+        play(cue(start: true), volume: 0.6)
     }
 
     static func recordingStopped() {
-        play(stop, volume: 0.55)
+        play(cue(start: false), volume: 0.55)
+    }
+
+    private static func cue(start: Bool) -> NSSound? {
+        switch SettingsStore.shared.soundPack {
+        case .minimal:
+            return bundled(start ? "RecordStart" : "RecordStop")
+        case .wood:
+            return bundled(start ? "WoodStart" : "WoodStop")
+        case .classic:
+            return NSSound(named: start ? "Pop" : "Tink")
+        }
     }
 
     private static func bundled(_ name: String) -> NSSound? {
-        guard let url = Bundle.main.url(forResource: name, withExtension: "wav") else { return nil }
-        return NSSound(contentsOf: url, byReference: true)
+        if let cached = cache[name] {
+            return cached
+        }
+        guard let url = Bundle.main.url(forResource: name, withExtension: "wav"),
+              let sound = NSSound(contentsOf: url, byReference: true) else { return nil }
+        cache[name] = sound
+        return sound
     }
 
     private static func play(_ sound: NSSound?, volume: Float) {
