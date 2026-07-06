@@ -225,18 +225,7 @@ struct TranscriptionPane: View {
     @ObservedObject private var library = ModelLibrary.shared
 
     var body: some View {
-        PaneScaffold(title: "Transcription", subtitle: "Cleanup and word replacements") {
-            SectionHeader("AI cleanup")
-            SettingsCard {
-                SettingsRow("Clean up transcripts with Apple Intelligence") {
-                    Toggle("Clean up transcripts", isOn: $settings.cleanupEnabled)
-                        .labelsHidden()
-                        .disabled(!Cleaner.isSupported)
-                }
-            }
-            CaptionText(Cleaner.unavailabilityHint
-                ?? "Removes filler words, applies self-corrections like 'scratch that', and turns 'new line' into a real line break. Runs entirely on this Mac.")
-
+        PaneScaffold(title: "Transcription", subtitle: "What happens to your words, in order") {
             SectionHeader("Names & phrases")
             SettingsCard {
                 ForEach($settings.vocabulary) { $word in
@@ -265,13 +254,24 @@ struct TranscriptionPane: View {
                     boosterControl
                 }
             }
-            CaptionText("With Enhanced recognition, these words are corrected inside the speech model itself ('Jaken' comes out 'Jachin'). AI cleanup, when on, catches the rest.")
+            CaptionText("Corrected acoustically inside the speech model, so 'Jaken' comes out 'Jachin'. Needs no Apple Intelligence, just the one-time download above.")
 
             if let error = library.lastError {
                 Text(error)
                     .font(.caption)
                     .foregroundStyle(.orange)
             }
+
+            SectionHeader("AI cleanup")
+            SettingsCard {
+                SettingsRow("Clean up transcripts with Apple Intelligence") {
+                    Toggle("Clean up transcripts", isOn: $settings.cleanupEnabled)
+                        .labelsHidden()
+                        .disabled(!Cleaner.isSupported)
+                }
+            }
+            CaptionText(Cleaner.unavailabilityHint
+                ?? "Removes filler words, applies self-corrections like 'scratch that', and turns 'new line' into a real line break. The only option on this pane that needs Apple Intelligence.")
 
             SectionHeader("Formatting")
             SettingsCard {
@@ -309,7 +309,7 @@ struct TranscriptionPane: View {
                     }
                 }
             }
-            CaptionText("Applied after every transcription. Case-insensitive, whole words.")
+            CaptionText("Literal find and replace, applied last. Case-insensitive, whole words. For name fixes, prefer Names & phrases at the top.")
         }
     }
 
