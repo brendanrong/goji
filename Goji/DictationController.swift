@@ -83,6 +83,15 @@ final class DictationController {
             }
             .store(in: &cancellables)
 
+        // The Enhanced recognition toggle turns the boost on and off live.
+        settings.$enhancedRecognition
+            .dropFirst()
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                self?.pushVocabulary()
+            }
+            .store(in: &cancellables)
+
         if Transcriber.modelsAvailableLocally || Transcriber.availableLocally(settings.selectedModel) {
             // Returning user: mic is long granted, so this prompt (which only
             // fires when NOT yet trusted) has the stage to itself.
@@ -99,7 +108,7 @@ final class DictationController {
     }
 
     private func pushVocabulary() {
-        let terms = settings.vocabularyTerms
+        let terms = settings.enhancedRecognition ? settings.vocabularyTerms : []
         Task {
             await transcriber.updateVocabulary(terms)
         }
@@ -124,7 +133,7 @@ final class DictationController {
         Task {
             do {
                 try await transcriber.prepare(model: settings.selectedModel)
-                await transcriber.updateVocabulary(settings.vocabularyTerms)
+                await transcriber.updateVocabulary(settings.enhancedRecognition ? settings.vocabularyTerms : [])
                 state.modelState = .ready
             } catch {
                 state.modelState = .failed(error.localizedDescription)
