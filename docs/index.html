@@ -54,9 +54,20 @@
   .btn-ghost:hover { border-color: var(--muted); }
   .req { margin-top: 16px; font-size: 14px; color: var(--muted); }
 
+  /* Demo video */
+  .demo {
+    display: block;
+    width: 100%;
+    max-width: 720px;
+    margin: 48px auto 0;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+  }
+
   /* HUD mock */
   .hud {
-    margin: 48px auto 0; width: fit-content;
+    margin: 28px auto 0; width: fit-content;
     display: flex; align-items: center; gap: 10px;
     background: rgba(20,15,16,.9); border: 1px solid var(--line);
     padding: 10px 18px; border-radius: 999px; backdrop-filter: blur(8px);
@@ -130,6 +141,8 @@
       <a class="btn-ghost" href="https://github.com/brendanrong/goji">View on GitHub</a>
     </div>
     <p class="req">Requires macOS 14 or later. Apple Silicon recommended.</p>
+
+    <video class="demo" src="goji-demo.mp4" autoplay muted loop playsinline aria-label="Goji demo: dictating into an app with the notch HUD"></video>
 
     <div class="hud" aria-hidden="true">
       <span class="bars"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span>
