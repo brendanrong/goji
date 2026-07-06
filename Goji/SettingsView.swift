@@ -66,7 +66,10 @@ struct SettingsView: View {
         .padding(.top, 52) // clears the transparent title bar
         .padding(.bottom, 12)
         .frame(width: 190)
-        .background(Color(nsColor: .underPageBackgroundColor))
+        // windowBackgroundColor sits close to the detail pane in both modes.
+        // underPageBackgroundColor looked right in dark but is Preview's
+        // mid-gray "behind the page" color in light: way too much contrast.
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var detail: some View {
