@@ -473,13 +473,6 @@ struct AboutPane: View {
                         NSWorkspace.shared.open(URL(string: "https://github.com/brendanrong/goji/issues")!)
                     }
                 }
-                Divider()
-                SettingsRow("Enjoying Goji?",
-                            subtitle: "Goji is free. If it saves you time, a coffee keeps it going.") {
-                    Button("Buy Me a Coffee") {
-                        NSWorkspace.shared.open(URL(string: "https://ko-fi.com/livewall")!)
-                    }
-                }
             }
         }
     }
