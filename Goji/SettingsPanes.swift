@@ -222,6 +222,7 @@ struct MicrophoneSection: View {
 
 struct TranscriptionPane: View {
     @ObservedObject private var settings = SettingsStore.shared
+    @ObservedObject private var library = ModelLibrary.shared
 
     var body: some View {
         PaneScaffold(title: "Transcription", subtitle: "Cleanup and word replacements") {
@@ -259,8 +260,18 @@ struct TranscriptionPane: View {
                         settings.vocabulary.append(VocabWord())
                     }
                 }
+                Divider()
+                SettingsRow("Enhanced recognition", subtitle: boosterSubtitle) {
+                    boosterControl
+                }
             }
-            CaptionText("AI cleanup nudges close mishearings to these exact spellings ('Jaken' becomes 'Jachin'). Needs the cleanup toggle on. One entry here replaces a pile of replacement rules.")
+            CaptionText("With Enhanced recognition, these words are corrected inside the speech model itself ('Jaken' comes out 'Jachin'). AI cleanup, when on, catches the rest.")
+
+            if let error = library.lastError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
 
             SectionHeader("Formatting")
             SettingsCard {
@@ -299,6 +310,41 @@ struct TranscriptionPane: View {
                 }
             }
             CaptionText("Applied after every transcription. Case-insensitive, whole words.")
+        }
+    }
+
+    private var boosterSubtitle: String {
+        if library.boosterProgress != nil {
+            return "Downloading the helper model…"
+        }
+        if Transcriber.boosterInstalled {
+            return "Active: your words are boosted inside the speech model itself, before any cleanup. Works with the Parakeet models."
+        }
+        return "A one-time helper model (~150 MB) teaches the recognizer to prefer your words. Works with the Parakeet models."
+    }
+
+    @ViewBuilder
+    private var boosterControl: some View {
+        if let progress = library.boosterProgress {
+            VStack(alignment: .trailing, spacing: 3) {
+                ProgressView(value: progress.fraction)
+                    .frame(width: 110)
+                Text("\(Int(progress.fraction * 100))%  \(progress.label)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        } else if Transcriber.boosterInstalled {
+            HStack(spacing: 4) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(Color.accentColor)
+                Text("Active")
+                    .foregroundStyle(.secondary)
+            }
+            .font(.callout)
+        } else {
+            Button("Download") {
+                library.downloadBooster()
+            }
         }
     }
 }
