@@ -1,19 +1,27 @@
 import FluidAudio
 import Foundation
 
-/// Wraps FluidAudio's Parakeet v3 pipeline. Actor keeps the heavy work off the main thread.
-/// Models load from a copy bundled into the app if present, otherwise download once
-/// from HuggingFace into the user cache.
+/// Wraps FluidAudio's speech engines. Actor keeps the heavy work off the main
+/// thread. Parakeet v2/v3 run through AsrManager; Cohere Transcribe runs
+/// through CoherePipeline. Which model loads comes from SettingsStore.
 actor Transcriber {
-    private var manager: AsrManager?
+    private var parakeet: AsrManager?
+    private var cohere: (pipeline: CoherePipeline, models: CoherePipeline.LoadedModels)?
+    private var loadedModel: SpeechModel?
 
-    /// True when no download is needed: either a model is bundled inside the
-    /// app or one is already in the FluidAudio cache.
-    nonisolated static var modelsAvailableLocally: Bool {
-        if let bundled = bundledModelURL, FileManager.default.fileExists(atPath: bundled.path) {
+    /// True when the given model needs no download: bundled inside the app
+    /// (default model only) or already in the FluidAudio cache.
+    nonisolated static func availableLocally(_ model: SpeechModel) -> Bool {
+        if model == .standard, let bundled = bundledModelURL,
+            FileManager.default.fileExists(atPath: bundled.path) {
             return true
         }
-        return AsrModels.modelsExist(at: AsrModels.defaultCacheDirectory(for: .v3), version: .v3)
+        return model.isInstalled
+    }
+
+    /// Kept for the fresh-install welcome flow: is the default model present.
+    nonisolated static var modelsAvailableLocally: Bool {
+        availableLocally(.standard)
     }
 
     private nonisolated static var bundledModelURL: URL? {
@@ -22,36 +30,56 @@ actor Transcriber {
             .appendingPathComponent("parakeet-tdt-0.6b-v3-coreml", isDirectory: true)
     }
 
-    func prepare(progressHandler: DownloadUtils.ProgressHandler? = nil) async throws {
-        guard manager == nil else { return }
-        let models = try await Self.loadModels(progressHandler: progressHandler)
-        let asr = AsrManager(config: .default)
-        try await asr.loadModels(models)
-        manager = asr
+    /// Loads the requested model, replacing whatever was loaded before.
+    func prepare(model: SpeechModel = .standard, progressHandler: DownloadUtils.ProgressHandler? = nil) async throws {
+        guard loadedModel != model else { return }
+
+        switch model {
+        case .parakeetV3, .parakeetV2:
+            let models = try await Self.loadParakeet(version: model.asrVersion!, progressHandler: progressHandler)
+            let asr = AsrManager(config: .default)
+            try await asr.loadModels(models)
+            parakeet = asr
+            cohere = nil
+        case .cohere:
+            let dir = model.directory
+            let loaded = try await CoherePipeline.loadModels(encoderDir: dir, decoderDir: dir, vocabDir: dir)
+            cohere = (CoherePipeline(), loaded)
+            parakeet = nil
+        }
+        loadedModel = model
     }
 
-    /// Prefers a model bundled inside the app (Canva distribution: no download on
-    /// first run), falls back to the download-and-cache path.
-    private static func loadModels(progressHandler: DownloadUtils.ProgressHandler?) async throws -> AsrModels {
-        if let bundled = bundledModelURL,
+    /// Parakeet loading prefers a copy bundled inside the app (Canva
+    /// distribution: no download on first run), then the cache, then the
+    /// HuggingFace download path.
+    private static func loadParakeet(
+        version: AsrModelVersion, progressHandler: DownloadUtils.ProgressHandler?
+    ) async throws -> AsrModels {
+        if version == .v3, let bundled = bundledModelURL,
             FileManager.default.fileExists(atPath: bundled.path) {
             do {
-                return try await AsrModels.load(from: bundled, version: .v3, progressHandler: progressHandler)
+                return try await AsrModels.load(from: bundled, version: version, progressHandler: progressHandler)
             } catch {
                 // Incomplete or stale bundle: fall through to the normal path.
             }
         }
-        return try await AsrModels.downloadAndLoad(version: .v3, progressHandler: progressHandler)
+        return try await AsrModels.downloadAndLoad(version: version, progressHandler: progressHandler)
     }
 
     /// Expects 16 kHz mono Float32 samples.
     func transcribe(_ samples: [Float]) async throws -> String {
-        guard let manager else {
-            throw GojiError("Model isn't loaded yet.")
+        if let parakeet {
+            // Fresh decoder state per utterance; every hotkey press is an
+            // independent dictation.
+            var decoderState = try TdtDecoderState()
+            let result = try await parakeet.transcribe(samples, decoderState: &decoderState)
+            return result.text
         }
-        // Fresh decoder state per utterance; every hotkey press is an independent dictation.
-        var decoderState = try TdtDecoderState()
-        let result = try await manager.transcribe(samples, decoderState: &decoderState)
-        return result.text
+        if let cohere {
+            let result = try await cohere.pipeline.transcribeLong(audio: samples, models: cohere.models)
+            return result.text
+        }
+        throw GojiError("Model isn't loaded yet.")
     }
 }

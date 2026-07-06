@@ -8,6 +8,7 @@ struct SettingsView: View {
         case general
         case microphone
         case transcription
+        case models
         case history
         case about
 
@@ -18,6 +19,7 @@ struct SettingsView: View {
             case .general: return "General"
             case .microphone: return "Microphone"
             case .transcription: return "Transcription"
+            case .models: return "Models"
             case .history: return "History"
             case .about: return "About"
             }
@@ -28,6 +30,7 @@ struct SettingsView: View {
             case .general: return "gearshape"
             case .microphone: return "mic"
             case .transcription: return "wand.and.stars"
+            case .models: return "cpu"
             case .history: return "clock"
             case .about: return "info.circle"
             }
@@ -78,6 +81,7 @@ struct SettingsView: View {
             case .general: GeneralPane()
             case .microphone: MicrophonePane()
             case .transcription: TranscriptionPane()
+            case .models: ModelsPane()
             case .history: HistoryPane()
             case .about: AboutPane()
             }
