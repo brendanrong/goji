@@ -249,7 +249,7 @@ struct TranscriptionPane: View {
                     }
                 }
             }
-            CaptionText("AI cleanup nudges close mishearings to these exact spellings ('Jaken' becomes 'Jachin'). Needs the cleanup toggle on. For stubborn repeat offenders, add a Word replacement below.")
+            CaptionText("AI cleanup nudges close mishearings to these exact spellings: 'air pods' becomes 'AirPods', 'sigma' becomes 'Figma'. Needs the cleanup toggle on. Works best with distinctive words; for two of your own terms that sound alike, use a Word replacement below instead.")
 
             SectionHeader("AI cleanup")
             SettingsCard {
