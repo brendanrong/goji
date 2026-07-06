@@ -287,6 +287,9 @@ struct HistoryPane: View {
 }
 
 struct AboutPane: View {
+    @ObservedObject private var settings = SettingsStore.shared
+    @ObservedObject private var updates = UpdateChecker.shared
+
     var body: some View {
         PaneScaffold(title: "About", subtitle: "Local, private dictation") {
             SettingsCard {
@@ -302,6 +305,25 @@ struct AboutPane: View {
                     }
                 }
                 .padding(.vertical, 12)
+                Divider()
+                SettingsRow("Updates", subtitle: updateStatus) {
+                    if updates.availableVersion != nil {
+                        Button("Download Update") {
+                            updates.openDownload()
+                        }
+                    } else {
+                        Button(updates.checking ? "Checking…" : "Check for Updates") {
+                            Task { await updates.check() }
+                        }
+                        .disabled(updates.checking)
+                    }
+                }
+                Divider()
+                SettingsRow("Check automatically",
+                            subtitle: "Asks GitHub once a day whether a newer version exists. Nothing else is sent.") {
+                    Toggle("Check automatically", isOn: $settings.autoCheckUpdates)
+                        .labelsHidden()
+                }
                 Divider()
                 SettingsRow("Private by design",
                             subtitle: "Audio, transcripts, and settings never leave this Mac. No account, no telemetry, free forever.") {
@@ -326,7 +348,14 @@ struct AboutPane: View {
     }
 
     private var version: String {
-        "Version " + ((Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "dev")
+        "Version " + UpdateChecker.currentVersion
+    }
+
+    private var updateStatus: String {
+        if let available = updates.availableVersion {
+            return "Goji \(available) is ready to download. You're on \(UpdateChecker.currentVersion)."
+        }
+        return "You're on the latest version."
     }
 }
 
