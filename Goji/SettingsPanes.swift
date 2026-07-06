@@ -51,9 +51,9 @@ struct GeneralPane: View {
                         .labelsHidden()
                 }
                 Divider()
-                SettingsRow("Mute other audio while dictating",
-                            subtitle: "Silences your speakers during recording so music doesn't bleed into the mic.") {
-                    Toggle("Mute other audio while dictating", isOn: $settings.muteWhileDictating)
+                SettingsRow("Pause media while dictating",
+                            subtitle: "Pauses music or video while you record and resumes it after, so nothing bleeds into the mic.") {
+                    Toggle("Pause media while dictating", isOn: $settings.pauseMediaWhileDictating)
                         .labelsHidden()
                 }
             }
