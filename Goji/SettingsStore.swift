@@ -157,6 +157,13 @@ struct ReplacementRule: Codable, Identifiable, Equatable {
     var replace = ""
 }
 
+/// A name or term the speaker uses; AI cleanup nudges close mishearings to
+/// these exact spellings. Later feeds decoder-level vocabulary biasing too.
+struct VocabWord: Codable, Identifiable, Equatable {
+    var id = UUID()
+    var text = ""
+}
+
 /// A user-recorded combination of modifier keys (e.g. Fn + Right ⌃).
 /// deviceMask is the union of the required bits; all must be held together.
 /// A zero mask means "selected Custom but nothing recorded yet" and falls
@@ -251,6 +258,16 @@ final class SettingsStore: ObservableObject {
     @Published var replacements: [ReplacementRule] {
         didSet { persistReplacements() }
     }
+    @Published var vocabulary: [VocabWord] {
+        didSet { persistVocabulary() }
+    }
+
+    /// Non-empty vocabulary entries, trimmed, ready for the cleanup prompt.
+    var vocabularyTerms: [String] {
+        vocabulary
+            .map { $0.text.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+    }
 
     private let defaults = UserDefaults.standard
     private var applyingLoginItem = false
@@ -262,6 +279,7 @@ final class SettingsStore: ObservableObject {
         static let hudStyle = "hudStyle"
         static let appearance = "appearance"
         static let replacements = "replacements"
+        static let vocabulary = "vocabularyWords"
         static let showInMenuBar = "showInMenuBar"
         static let showInDock = "showInDock"
         static let micDeviceUID = "micDeviceUID"
@@ -313,6 +331,12 @@ final class SettingsStore: ObservableObject {
             replacements = rules
         } else {
             replacements = []
+        }
+        if let data = d.data(forKey: Keys.vocabulary),
+           let words = try? JSONDecoder().decode([VocabWord].self, from: data) {
+            vocabulary = words
+        } else {
+            vocabulary = []
         }
     }
 
@@ -390,5 +414,10 @@ final class SettingsStore: ObservableObject {
     private func persistReplacements() {
         guard let data = try? JSONEncoder().encode(replacements) else { return }
         defaults.set(data, forKey: Keys.replacements)
+    }
+
+    private func persistVocabulary() {
+        guard let data = try? JSONEncoder().encode(vocabulary) else { return }
+        defaults.set(data, forKey: Keys.vocabulary)
     }
 }

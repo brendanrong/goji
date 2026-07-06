@@ -41,10 +41,12 @@ enum Cleaner {
         return "Needs macOS 26 with Apple Intelligence enabled on this Mac."
     }
 
-    static func cleanup(_ text: String) async -> String {
+    /// vocabulary: names and terms the speaker uses; close mishearings get
+    /// nudged to these exact spellings during cleanup.
+    static func cleanup(_ text: String, vocabulary: [String] = []) async -> String {
         #if canImport(FoundationModels)
         if #available(macOS 26.0, *) {
-            return await FoundationCleaner.shared.cleanup(text)
+            return await FoundationCleaner.shared.cleanup(text, vocabulary: vocabulary)
         }
         #endif
         return text
@@ -56,7 +58,7 @@ enum Cleaner {
 actor FoundationCleaner {
     static let shared = FoundationCleaner()
 
-    private static let instructions = """
+    private static let baseInstructions = """
         You are a transcript editor. You receive one dictated transcript and \
         return the same transcript, lightly cleaned. Rules:
         - Fix punctuation, capitalization, and spacing.
@@ -69,13 +71,24 @@ actor FoundationCleaner {
         Return only the cleaned transcript, with no quotes and no commentary.
         """
 
-    func cleanup(_ text: String) async -> String {
+    private static func instructions(vocabulary: [String]) -> String {
+        guard !vocabulary.isEmpty else { return baseInstructions }
+        return baseInstructions + """
+            \nThe speaker's vocabulary includes these exact names and terms: \
+            \(vocabulary.joined(separator: ", ")). \
+            When a word in the transcript is a close mishearing of one of them, \
+            replace it with the exact listed spelling. Do not change words that \
+            are not close matches.
+            """
+    }
+
+    func cleanup(_ text: String, vocabulary: [String] = []) async -> String {
         guard SystemLanguageModel.default.isAvailable else { return text }
         do {
             // Fresh session every time. Reusing one accumulates prior
             // transcripts as chat history, which drifts the model into
             // replying to the text instead of editing it.
-            let session = LanguageModelSession(instructions: Self.instructions)
+            let session = LanguageModelSession(instructions: Self.instructions(vocabulary: vocabulary))
             let prompt = """
                 Clean up the dictated transcript between the markers. Apply only the rules.
 
