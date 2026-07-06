@@ -224,6 +224,11 @@ struct MicrophoneSection: View {
 struct TranscriptionPane: View {
     @ObservedObject private var settings = SettingsStore.shared
     @State private var packStatus: String?
+    @State private var composerWord = ""
+    @State private var suggestions: [String]?
+    @State private var selectedSuggestions = Set<String>()
+    @State private var suggesting = false
+    @State private var composerNote: String?
 
     var body: some View {
         PaneScaffold(title: "Transcription", subtitle: "What happens to your words, in order") {
@@ -275,6 +280,59 @@ struct TranscriptionPane: View {
 
             SectionHeader("Word replacements")
             SettingsCard {
+                HStack {
+                    TextField("Word or name Goji mishears, e.g. Jira", text: $composerWord)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit { suggestVariations() }
+                    if suggestions == nil {
+                        Button(suggesting ? "Thinking…" : "Suggest Variations") {
+                            suggestVariations()
+                        }
+                        .disabled(suggesting || !Cleaner.isSupported || composerWord.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .help(Cleaner.isSupported ? "Generate likely mishearings to approve as rules" : "Suggestions need Apple Intelligence")
+                    } else {
+                        Button("Cancel") {
+                            resetComposer()
+                        }
+                    }
+                }
+                .padding(.vertical, 10)
+                if let suggestions {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Likely mishearings, click to exclude:")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        FlowLayout(spacing: 8) {
+                            ForEach(suggestions, id: \.self) { suggestion in
+                                SelectableChip(text: suggestion, isOn: selectedSuggestions.contains(suggestion)) {
+                                    if selectedSuggestions.contains(suggestion) {
+                                        selectedSuggestions.remove(suggestion)
+                                    } else {
+                                        selectedSuggestions.insert(suggestion)
+                                    }
+                                }
+                            }
+                        }
+                        HStack(spacing: 10) {
+                            Button("Add \(selectedSuggestions.count) Rules") {
+                                addSelectedVariations()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(selectedSuggestions.isEmpty)
+                            Text("Also adds \"\(composerWord.trimmingCharacters(in: .whitespaces))\" to Names & phrases")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.bottom, 10)
+                }
+                if let composerNote {
+                    Text(composerNote)
+                        .font(.caption)
+                        .foregroundStyle(Color.accentColor)
+                        .padding(.bottom, 8)
+                }
+                Divider()
                 ForEach($settings.replacements) { $rule in
                     HStack {
                         TextField("Replace", text: $rule.find)
@@ -319,6 +377,47 @@ struct TranscriptionPane: View {
             }
             CaptionText("Literal find and replace, applied last. Case-insensitive, whole words. For name fixes, prefer Names & phrases at the top.")
         }
+    }
+
+    private func suggestVariations() {
+        let word = composerWord.trimmingCharacters(in: .whitespaces)
+        guard !word.isEmpty, !suggesting, Cleaner.isSupported else { return }
+        suggesting = true
+        composerNote = nil
+        Task {
+            let results = await VariationSuggester.suggestions(for: word)
+            let existing = Set(settings.replacements.map { $0.find.lowercased() })
+            let fresh = results.filter { !existing.contains($0.lowercased()) }
+            suggesting = false
+            if fresh.isEmpty {
+                suggestions = nil
+                composerNote = "No suggestions for that one; add rules manually below."
+            } else {
+                suggestions = fresh
+                selectedSuggestions = Set(fresh)
+            }
+        }
+    }
+
+    private func addSelectedVariations() {
+        let word = composerWord.trimmingCharacters(in: .whitespaces)
+        guard !word.isEmpty else { return }
+        for suggestion in selectedSuggestions.sorted() {
+            settings.replacements.append(ReplacementRule(find: suggestion, replace: word))
+        }
+        if !settings.vocabulary.contains(where: { $0.text.compare(word, options: .caseInsensitive) == .orderedSame }) {
+            settings.vocabulary.append(VocabWord(text: word))
+        }
+        let count = selectedSuggestions.count
+        resetComposer()
+        composerNote = "Added \(count) rules for \(word)."
+    }
+
+    private func resetComposer() {
+        composerWord = ""
+        suggestions = nil
+        selectedSuggestions = []
+        composerNote = nil
     }
 
     private func importPack() {
