@@ -1,39 +1,42 @@
 import CoreAudio
 
-/// Silences the default output device while dictating, then restores it.
-/// Prefers the device's real mute switch; falls back to zeroing the volume for
-/// outputs without one (HDMI/DisplayPort monitors, some USB DACs). Devices
-/// exposing neither control are left alone.
+/// Volume control over the default output while dictating. Ducks to a
+/// fraction of the current level and restores afterward. Outputs exposing no
+/// volume control (some HDMI/DisplayPort monitors) can't be ducked; callers
+/// fall back to pausing media instead.
 enum SystemAudio {
     private struct Saved {
         let device: AudioDeviceID
-        let mute: UInt32?
         let volumes: [(element: UInt32, value: Float32)]
     }
     private static var saved: Saved?
 
-    static func muteOutput() {
-        guard saved == nil, let device = defaultOutputDevice() else { return }
+    /// Drops the output volume to ~20% of its current level. Returns false
+    /// when the device has no volume control.
+    static func duckOutput() -> Bool {
+        guard saved == nil else { return true }
+        guard let device = defaultOutputDevice() else { return false }
 
-        if isSettable(device, kAudioDevicePropertyMute, element: 0),
-           let previous: UInt32 = read(device, kAudioDevicePropertyMute, element: 0),
-           write(device, kAudioDevicePropertyMute, element: 0, value: UInt32(1)) {
-            saved = Saved(device: device, mute: previous, volumes: [])
-            return
-        }
-
-        // No mute switch: zero the volume instead. Master element when the
-        // device has one, otherwise per channel (left 1, right 2).
+        // Master element when the device has one, otherwise per channel.
         let elements: [UInt32] = isSettable(device, kAudioDevicePropertyVolumeScalar, element: 0) ? [0] : [1, 2]
         var volumes: [(element: UInt32, value: Float32)] = []
         for element in elements {
             guard isSettable(device, kAudioDevicePropertyVolumeScalar, element: element),
                   let previous: Float32 = read(device, kAudioDevicePropertyVolumeScalar, element: element),
-                  write(device, kAudioDevicePropertyVolumeScalar, element: element, value: Float32(0)) else { continue }
+                  write(device, kAudioDevicePropertyVolumeScalar, element: element, value: Float32(previous * 0.2)) else { continue }
             volumes.append((element, previous))
         }
-        if !volumes.isEmpty {
-            saved = Saved(device: device, mute: nil, volumes: volumes)
+        guard !volumes.isEmpty else { return false }
+        saved = Saved(device: device, volumes: volumes)
+        return true
+    }
+
+    /// No-op unless duckOutput actually changed something.
+    static func restoreOutput() {
+        guard let s = saved else { return }
+        saved = nil
+        for volume in s.volumes {
+            _ = write(s.device, kAudioDevicePropertyVolumeScalar, element: volume.element, value: volume.value)
         }
     }
 
@@ -52,18 +55,6 @@ enum SystemAudio {
         var size = UInt32(MemoryLayout<UInt32>.size)
         guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, &running) == noErr else { return false }
         return running != 0
-    }
-
-    /// No-op unless muteOutput actually changed something.
-    static func restoreOutput() {
-        guard let s = saved else { return }
-        saved = nil
-        if let mute = s.mute {
-            _ = write(s.device, kAudioDevicePropertyMute, element: 0, value: mute)
-        }
-        for volume in s.volumes {
-            _ = write(s.device, kAudioDevicePropertyVolumeScalar, element: volume.element, value: volume.value)
-        }
     }
 
     // MARK: - CoreAudio plumbing
