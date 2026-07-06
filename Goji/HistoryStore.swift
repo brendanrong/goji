@@ -12,7 +12,7 @@ final class HistoryStore: ObservableObject {
     static let shared = HistoryStore()
 
     private static let storageKey = "history"
-    private static let cap = 50
+    private static let cap = 500
 
     @Published private(set) var items: [HistoryItem]
 

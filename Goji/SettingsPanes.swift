@@ -578,6 +578,7 @@ struct HistoryPane: View {
     @ObservedObject private var history = HistoryStore.shared
     @ObservedObject private var settings = SettingsStore.shared
     @ObservedObject private var stats = StatsStore.shared
+    @State private var visibleCount = 20
     @State private var expandedID: UUID?
     @State private var selection: ClosedRange<Int>?
     @State private var replaceWith = ""
@@ -602,16 +603,38 @@ struct HistoryPane: View {
                 }
             } else {
                 SettingsCard {
-                    ForEach(history.items.prefix(8)) { item in
+                    ForEach(history.items.prefix(visibleCount)) { item in
                         row(for: item)
                         if expandedID == item.id {
                             ruleEditor(for: item)
                         }
                         Divider()
                     }
+                    if history.items.count > visibleCount {
+                        SettingsRow("Showing \(visibleCount) of \(history.items.count)") {
+                            Button("Show More") {
+                                visibleCount += 20
+                            }
+                        }
+                        Divider()
+                    }
+                    SettingsRow("Save every transcript to a file") {
+                        Button("Export…") {
+                            exportHistory()
+                        }
+                    }
+                    Divider()
                     SettingsRow("Remove all transcripts") {
                         Button("Clear History", role: .destructive) {
                             history.clear()
+                        }
+                    }
+                    if stats.totalWords > 0 {
+                        Divider()
+                        SettingsRow("Start the counters from zero") {
+                            Button("Reset Stats", role: .destructive) {
+                                stats.reset()
+                            }
                         }
                     }
                 }
@@ -741,6 +764,22 @@ struct HistoryPane: View {
         expandedID = nil
         selection = nil
         replaceWith = ""
+    }
+
+    private func exportHistory() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.plainText]
+        panel.nameFieldStringValue = "goji-history.txt"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        let lines = history.items.map { "[\(formatter.string(from: $0.date))]  \($0.text)" }
+        do {
+            try lines.joined(separator: "\n").write(to: url, atomically: true, encoding: .utf8)
+            ruleNote = "Exported \(history.items.count) transcripts."
+        } catch {
+            ruleNote = "Export failed: \(error.localizedDescription)"
+        }
     }
 
     private func statTile(_ label: String, _ value: String) -> some View {
