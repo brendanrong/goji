@@ -115,6 +115,10 @@ final class SettingsStore: ObservableObject {
     @Published var doubleTapLock: Bool {
         didSet { defaults.set(doubleTapLock, forKey: Keys.doubleTapLock) }
     }
+    /// Mute the speakers while recording so playing audio doesn't hit the mic.
+    @Published var muteWhileDictating: Bool {
+        didSet { defaults.set(muteWhileDictating, forKey: Keys.muteWhileDictating) }
+    }
     @Published var cleanupEnabled: Bool {
         didSet { defaults.set(cleanupEnabled, forKey: Keys.cleanupEnabled) }
     }
@@ -144,6 +148,7 @@ final class SettingsStore: ObservableObject {
         static let micDeviceUID = "micDeviceUID"
         static let playSounds = "playSounds"
         static let doubleTapLock = "doubleTapLock"
+        static let muteWhileDictating = "muteWhileDictating"
         static let cleanupEnabled = "cleanupEnabled"
     }
 
@@ -158,6 +163,7 @@ final class SettingsStore: ObservableObject {
         micDeviceUID = d.string(forKey: Keys.micDeviceUID)
         playSounds = (d.object(forKey: Keys.playSounds) as? Bool) ?? true
         doubleTapLock = (d.object(forKey: Keys.doubleTapLock) as? Bool) ?? true
+        muteWhileDictating = d.bool(forKey: Keys.muteWhileDictating)
         cleanupEnabled = d.bool(forKey: Keys.cleanupEnabled)
         if let data = d.data(forKey: Keys.replacements),
            let rules = try? JSONDecoder().decode([ReplacementRule].self, from: data) {
