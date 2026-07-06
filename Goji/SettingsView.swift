@@ -58,9 +58,6 @@ struct SettingsView: View {
             Spacer()
             Divider()
                 .padding(.vertical, 6)
-            SidebarRow(label: "Buy me a coffee", icon: "cup.and.saucer", selected: false) {
-                NSWorkspace.shared.open(URL(string: "https://ko-fi.com/livewall")!)
-            }
             SidebarRow(label: "Quit Goji", icon: "power", selected: false) {
                 NSApp.terminate(nil)
             }
