@@ -5,3 +5,6 @@ DerivedData/
 build/
 .fluidaudio-src/
 dist/
+
+# local demo footage (served copy lives in docs/)
+Goji Demo.mp4
