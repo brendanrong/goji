@@ -108,9 +108,9 @@ final class DictationController {
     }
 
     private func pushVocabulary() {
-        let terms = settings.enhancedRecognition ? settings.vocabularyTerms : []
+        let words = settings.enhancedRecognition ? settings.vocabulary : []
         Task {
-            await transcriber.updateVocabulary(terms)
+            await transcriber.updateVocabulary(words)
         }
     }
 
@@ -133,7 +133,7 @@ final class DictationController {
         Task {
             do {
                 try await transcriber.prepare(model: settings.selectedModel)
-                await transcriber.updateVocabulary(settings.enhancedRecognition ? settings.vocabularyTerms : [])
+                await transcriber.updateVocabulary(settings.enhancedRecognition ? settings.vocabulary : [])
                 state.modelState = .ready
             } catch {
                 state.modelState = .failed(error.localizedDescription)
@@ -350,7 +350,7 @@ final class DictationController {
                 guard !cleaned.isEmpty else { return }
 
                 if settings.cleanupEnabled {
-                    cleaned = await Cleaner.cleanup(cleaned, vocabulary: settings.vocabularyTerms)
+                    cleaned = await Cleaner.cleanup(cleaned, vocabulary: settings.vocabularyPromptLines)
                 }
                 cleaned = settings.applyReplacements(to: cleaned)
                 if settings.removeTrailingFullStop {
