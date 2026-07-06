@@ -25,9 +25,11 @@ actor Transcriber {
     }
 
     private nonisolated static var bundledModelURL: URL? {
+        // Matches Repo.parakeetV3.folderName: FluidAudio drops the -coreml
+        // suffix from repo names for its on-disk folders.
         Bundle.main.resourceURL?
             .appendingPathComponent("FluidAudioModels", isDirectory: true)
-            .appendingPathComponent("parakeet-tdt-0.6b-v3-coreml", isDirectory: true)
+            .appendingPathComponent("parakeet-tdt-0.6b-v3", isDirectory: true)
     }
 
     /// Loads the requested model, replacing whatever was loaded before.
