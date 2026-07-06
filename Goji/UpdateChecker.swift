@@ -218,12 +218,18 @@ final class UpdateChecker: ObservableObject {
             self.onProgress = onProgress
         }
 
+        private var lastReportedFraction = -1.0
+
         func urlSession(
             _ session: URLSession, downloadTask: URLSessionDownloadTask,
             didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64
         ) {
             guard totalBytesExpectedToWrite > 0 else { return }
-            onProgress(Double(totalBytesWritten) / Double(totalBytesExpectedToWrite))
+            let fraction = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
+            // Same throttling as ModelFetcher: don't flood the main actor.
+            guard fraction - lastReportedFraction >= 0.005 || fraction >= 1 else { return }
+            lastReportedFraction = fraction
+            onProgress(fraction)
         }
 
         func urlSession(

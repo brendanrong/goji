@@ -91,12 +91,20 @@ enum ModelFetcher {
             self.onProgress = onProgress
         }
 
+        private var lastReportedFraction = -1.0
+
         func urlSession(
             _ session: URLSession, downloadTask: URLSessionDownloadTask,
             didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64
         ) {
             guard totalBytesExpectedToWrite > 0 else { return }
-            onProgress(Double(totalBytesWritten) / Double(totalBytesExpectedToWrite))
+            let fraction = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
+            // URLSession fires this hundreds of times a second; forwarding
+            // every tick floods the main actor and the bar stutters. Report
+            // in >=0.5% steps, which also keeps it monotonic.
+            guard fraction - lastReportedFraction >= 0.005 || fraction >= 1 else { return }
+            lastReportedFraction = fraction
+            onProgress(fraction)
         }
 
         func urlSession(
