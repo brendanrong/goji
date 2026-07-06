@@ -9,6 +9,90 @@ actor Transcriber {
     private var cohere: (pipeline: CoherePipeline, models: CoherePipeline.LoadedModels)?
     private var loadedModel: SpeechModel?
 
+    // Vocabulary boosting: CTC word spotting + constrained rescoring nudges
+    // the transcript toward the user's Names & phrases at the acoustic level.
+    // Parakeet only; requires the small CTC helper model.
+    private var ctcModels: CtcModels?
+    private var spotter: CtcKeywordSpotter?
+    private var rescorer: VocabularyRescorer?
+    private var vocabContext: CustomVocabularyContext?
+    private var loadedVocabTerms: [String] = []
+
+    /// True when the CTC helper model for Names & phrases boosting is cached.
+    nonisolated static var boosterInstalled: Bool {
+        CtcModels.modelsExist(at: CtcModels.defaultCacheDirectory(for: .ctc110m))
+    }
+
+    /// Rebuilds the boosting pipeline for the given terms. Cheap no-op when
+    /// nothing changed; silently degrades to plain transcription on failure.
+    func updateVocabulary(_ terms: [String]) async {
+        let wantsBoost = !terms.isEmpty && Self.boosterInstalled
+        guard terms != loadedVocabTerms || (wantsBoost && rescorer == nil) else { return }
+        loadedVocabTerms = terms
+        vocabContext = nil
+        spotter = nil
+        rescorer = nil
+        guard wantsBoost else { return }
+
+        do {
+            let cacheDir = CtcModels.defaultCacheDirectory(for: .ctc110m)
+            let models: CtcModels
+            if let ctcModels {
+                models = ctcModels
+            } else {
+                // Files are already cached, so this loads without downloading.
+                models = try await CtcModels.downloadAndLoad(variant: .ctc110m)
+                ctcModels = models
+            }
+
+            let tokenizer = try await CtcTokenizer.load(from: cacheDir)
+            let tokenized = terms.compactMap { text -> CustomVocabularyTerm? in
+                let ids = tokenizer.encode(text)
+                guard !ids.isEmpty else { return nil }
+                return CustomVocabularyTerm(text: text, weight: nil, aliases: nil, tokenIds: nil, ctcTokenIds: ids)
+            }
+            guard !tokenized.isEmpty else { return }
+
+            let context = CustomVocabularyContext(terms: tokenized)
+            let spot = CtcKeywordSpotter(models: models, blankId: models.vocabulary.count)
+            rescorer = try await VocabularyRescorer.create(
+                spotter: spot,
+                vocabulary: context,
+                ctcModelDirectory: cacheDir
+            )
+            vocabContext = context
+            spotter = spot
+        } catch {
+            // Boosting is best-effort: plain transcription keeps working.
+            vocabContext = nil
+            spotter = nil
+            rescorer = nil
+        }
+    }
+
+    /// Rescores a Parakeet transcript toward vocabulary terms when the
+    /// acoustics support it. Returns the original text when boosting is off
+    /// or nothing beat the threshold.
+    private func boost(_ text: String, samples: [Float], timings: [TokenTiming]?) async -> String {
+        guard let spotter, let rescorer, let vocabContext,
+              let timings, !timings.isEmpty else { return text }
+        guard let spotResult = try? await spotter.spotKeywordsWithLogProbs(
+            audioSamples: samples, customVocabulary: vocabContext, minScore: nil
+        ), !spotResult.logProbs.isEmpty else { return text }
+
+        let config = ContextBiasingConstants.rescorerConfig(forVocabSize: vocabContext.terms.count)
+        let output = rescorer.ctcTokenRescore(
+            transcript: text,
+            tokenTimings: timings,
+            logProbs: spotResult.logProbs,
+            frameDuration: spotResult.frameDuration,
+            cbw: config.cbw,
+            marginSeconds: 0.5,
+            minSimilarity: max(config.minSimilarity, vocabContext.minSimilarity)
+        )
+        return output.wasModified ? output.text : text
+    }
+
     /// True when the given model needs no download: bundled inside the app
     /// (default model only) or already in the FluidAudio cache.
     nonisolated static func availableLocally(_ model: SpeechModel) -> Bool {
@@ -76,7 +160,7 @@ actor Transcriber {
             // independent dictation.
             var decoderState = try TdtDecoderState()
             let result = try await parakeet.transcribe(samples, decoderState: &decoderState)
-            return result.text
+            return await boost(result.text, samples: samples, timings: result.tokenTimings)
         }
         if let cohere {
             let result = try await cohere.pipeline.transcribeLong(audio: samples, models: cohere.models)
