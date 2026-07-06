@@ -315,6 +315,9 @@ final class DictationController {
                 var cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !cleaned.isEmpty else { return }
 
+                // Learned mishearings first: deterministic, AI-free.
+                cleaned = settings.applyLearnedCorrections(to: cleaned)
+
                 if settings.cleanupEnabled {
                     cleaned = await Cleaner.cleanup(cleaned, vocabulary: settings.vocabularyPromptLines)
                 }

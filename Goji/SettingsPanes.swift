@@ -256,7 +256,7 @@ struct TranscriptionPane: View {
                     }
                 }
             }
-            CaptionText("AI cleanup nudges close mishearings to these exact spellings ('Jaken' becomes 'Jachin'), including the ones Goji learns when you fix transcripts in History. Needs the cleanup toggle on.")
+            CaptionText("Mishearings you've fixed in History are corrected automatically on every dictation, no Apple Intelligence needed. AI cleanup, when on, additionally catches new mishearings from context.")
 
             SectionHeader("AI cleanup")
             SettingsCard {
