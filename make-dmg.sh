@@ -82,7 +82,7 @@ tell application "Finder"
     set the bounds of container window to {200, 120, 860, 520}
     set viewOptions to the icon view options of container window
     set arrangement of viewOptions to not arranged
-    set icon size of viewOptions to 100
+    set icon size of viewOptions to 112
     set background picture of viewOptions to file ".background:background.png"
     set position of item "Goji.app" of container window to {165, 175}
     set position of item "Applications" of container window to {495, 175}
