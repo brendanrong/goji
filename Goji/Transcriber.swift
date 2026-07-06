@@ -9,12 +9,13 @@ actor Transcriber {
     private var cohere: (pipeline: CoherePipeline, models: CoherePipeline.LoadedModels)?
     private var loadedModel: SpeechModel?
 
-    // Vocabulary boosting: CTC word spotting + constrained rescoring nudges
-    // the transcript toward the user's Names & phrases at the acoustic level.
-    // Parakeet only; requires the small CTC helper model.
+    // Vocabulary boosting: the CTC spotter finds WHERE a Names & phrases term
+    // was heard; a word only gets swapped when its TEXT also resembles the
+    // term or one of its learned mishearings. (The library's batch rescorer
+    // misaligns replacements onto neighboring words, so the confirmation step
+    // is ours.) Parakeet only; requires the small CTC helper model.
     private var ctcModels: CtcModels?
     private var spotter: CtcKeywordSpotter?
-    private var rescorer: VocabularyRescorer?
     private var vocabContext: CustomVocabularyContext?
     private var loadedVocabWords: [VocabWord] = []
 
@@ -28,11 +29,10 @@ actor Transcriber {
     func updateVocabulary(_ words: [VocabWord]) async {
         let usable = words.filter { !$0.text.trimmingCharacters(in: .whitespaces).isEmpty }
         let wantsBoost = !usable.isEmpty && Self.boosterInstalled
-        guard usable != loadedVocabWords || (wantsBoost && rescorer == nil) else { return }
+        guard usable != loadedVocabWords || (wantsBoost && spotter == nil) else { return }
         loadedVocabWords = usable
         vocabContext = nil
         spotter = nil
-        rescorer = nil
         guard wantsBoost else { return }
 
         do {
@@ -62,56 +62,108 @@ actor Transcriber {
             }
             guard !tokenized.isEmpty else { return }
 
-            // Precision over recall: the library's defaults (similarity 0.50,
-            // heavy bias) happily turn everyday words into vocabulary terms.
-            // A missed boost is mildly annoying; a false one is corrosive.
-            let context = CustomVocabularyContext(terms: tokenized, minSimilarity: 0.72)
-            let spot = CtcKeywordSpotter(models: models, blankId: models.vocabulary.count)
-            rescorer = try await VocabularyRescorer.create(
-                spotter: spot,
-                vocabulary: context,
-                ctcModelDirectory: cacheDir
-            )
-            vocabContext = context
-            spotter = spot
+            vocabContext = CustomVocabularyContext(terms: tokenized)
+            spotter = CtcKeywordSpotter(models: models, blankId: models.vocabulary.count)
         } catch {
             // Boosting is best-effort: plain transcription keeps working.
             vocabContext = nil
             spotter = nil
-            rescorer = nil
         }
     }
 
-    /// Rescores a Parakeet transcript toward vocabulary terms when the
-    /// acoustics support it. Returns the original text when boosting is off
-    /// or nothing beat the threshold.
+    /// Swaps transcript words for vocabulary terms only when BOTH hold: the
+    /// spotter heard the term at that moment, and the written word textually
+    /// resembles the term or one of its learned mishearings. "ok" can never
+    /// pass for "Jachin" no matter what the audio says.
     private func boost(_ text: String, samples: [Float], timings: [TokenTiming]?) async -> String {
-        guard let spotter, let rescorer, let vocabContext,
+        guard let spotter, let vocabContext,
               let timings, !timings.isEmpty else { return text }
         guard let spotResult = try? await spotter.spotKeywordsWithLogProbs(
             audioSamples: samples, customVocabulary: vocabContext, minScore: nil
-        ), !spotResult.logProbs.isEmpty else { return text }
+        ), !spotResult.detections.isEmpty else { return text }
 
-        // Conservative dials: default bias weight (not the 4.5 the size-based
-        // config suggests) and a high similarity bar.
-        let output = rescorer.ctcTokenRescore(
-            transcript: text,
-            tokenTimings: timings,
-            logProbs: spotResult.logProbs,
-            frameDuration: spotResult.frameDuration,
-            cbw: ContextBiasingConstants.defaultCbw,
-            marginSeconds: 0.5,
-            minSimilarity: max(0.72, vocabContext.minSimilarity)
-        )
-        guard output.wasModified else { return text }
+        // Word-level timings from token timings (SentencePiece "▁" marks starts).
+        var words: [(text: String, start: TimeInterval, end: TimeInterval)] = []
+        for timing in timings {
+            let isWordStart = timing.token.hasPrefix("▁") || timing.token.hasPrefix(" ") || words.isEmpty
+            let piece = timing.token
+                .replacingOccurrences(of: "▁", with: "")
+                .trimmingCharacters(in: .whitespaces)
+            if isWordStart {
+                words.append((piece, timing.startTime, timing.endTime))
+            } else {
+                words[words.count - 1].text += piece
+                words[words.count - 1].end = timing.endTime
+            }
+        }
+        words.removeAll { $0.text.isEmpty }
+        guard !words.isEmpty else { return text }
 
-        // Sanity guard: if the rescorer wants to rewrite a big chunk of the
-        // sentence into vocabulary terms, it has gone rogue. Keep the original.
-        let wordCount = max(text.split(whereSeparator: \.isWhitespace).count, 1)
-        let replacedCount = output.replacements.filter { $0.shouldReplace }.count
-        guard replacedCount <= max(2, wordCount / 5) else { return text }
+        var replaced = words.map { $0.text }
+        var replacements = 0
+        let slack: TimeInterval = 0.35
 
-        return output.text
+        for detection in spotResult.detections {
+            let term = detection.term
+            let targets = [term.text] + (term.aliases ?? [])
+
+            // Words overlapping the detection window, with a little slack for
+            // timing skew between the two models.
+            let windowStart = detection.startTime - slack
+            let windowEnd = detection.endTime + slack
+            let candidates = words.indices.filter { words[$0].end >= windowStart && words[$0].start <= windowEnd }
+            guard !candidates.isEmpty else { continue }
+
+            // Best textual match among runs of 1 to 3 consecutive words.
+            var best: (score: Double, range: ClosedRange<Int>)?
+            for start in candidates {
+                for length in 1...3 {
+                    let end = start + length - 1
+                    guard end < words.count, candidates.contains(end) else { break }
+                    let phrase = replaced[start...end].joined(separator: " ")
+                    let score = targets.map { Self.similarity(phrase, $0) }.max() ?? 0
+                    if score > (best?.score ?? 0) {
+                        best = (score, start...end)
+                    }
+                }
+            }
+            guard let best, best.score >= 0.6 else { continue }
+
+            let current = replaced[best.range].joined(separator: " ")
+            guard current.compare(term.text, options: .caseInsensitive) != .orderedSame else { continue }
+
+            // Preserve punctuation clinging to the replaced run.
+            let leading = String(current.prefix(while: { $0.isPunctuation }))
+            let trailing = String(current.reversed().prefix(while: { $0.isPunctuation }).reversed())
+            for index in best.range {
+                replaced[index] = ""
+            }
+            replaced[best.range.lowerBound] = leading + term.text + trailing
+            replacements += 1
+        }
+
+        guard replacements > 0, replacements <= max(2, words.count / 4) else { return text }
+        let result = replaced.filter { !$0.isEmpty }.joined(separator: " ")
+        return result.isEmpty ? text : result
+    }
+
+    /// Normalized Levenshtein similarity, case- and punctuation-insensitive.
+    private static func similarity(_ a: String, _ b: String) -> Double {
+        let x = Array(a.lowercased().filter { $0.isLetter || $0.isNumber || $0.isWhitespace })
+        let y = Array(b.lowercased().filter { $0.isLetter || $0.isNumber || $0.isWhitespace })
+        guard !x.isEmpty, !y.isEmpty else { return 0 }
+        var dp = Array(0...y.count)
+        for i in 1...x.count {
+            var previous = dp[0]
+            dp[0] = i
+            for j in 1...y.count {
+                let cost = x[i - 1] == y[j - 1] ? 0 : 1
+                let value = min(dp[j] + 1, dp[j - 1] + 1, previous + cost)
+                previous = dp[j]
+                dp[j] = value
+            }
+        }
+        return 1.0 - Double(dp[y.count]) / Double(max(x.count, y.count))
     }
 
     /// True when the given model needs no download: bundled inside the app
