@@ -283,6 +283,30 @@ final class SettingsStore: ObservableObject {
         }
     }
 
+    /// Deterministic pass over a fresh transcript: every learned mishearing
+    /// becomes its term. Whole words, case-insensitive, no AI involved, so
+    /// corrections work with or without Apple Intelligence.
+    func applyLearnedCorrections(to text: String) -> String {
+        var result = text
+        for word in vocabulary {
+            let term = word.text.trimmingCharacters(in: .whitespaces)
+            guard !term.isEmpty else { continue }
+            for alias in word.aliases ?? [] {
+                let find = alias.trimmingCharacters(in: .whitespaces)
+                guard !find.isEmpty else { continue }
+                let pattern = "\\b\(NSRegularExpression.escapedPattern(for: find))\\b"
+                guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { continue }
+                let range = NSRange(result.startIndex..., in: result)
+                result = regex.stringByReplacingMatches(
+                    in: result,
+                    range: range,
+                    withTemplate: NSRegularExpression.escapedTemplate(for: term)
+                )
+            }
+        }
+        return result
+    }
+
     /// Folds corrections from a History fix into the vocabulary: the right
     /// spelling becomes (or updates) an entry, the mishearing becomes an alias.
     func learn(_ corrections: [(wrong: String, right: String)]) {
