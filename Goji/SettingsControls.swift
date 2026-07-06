@@ -31,6 +31,8 @@ struct PaneScaffold<Content: View>: View {
             }
         }
         .toggleStyle(.switch)
+        // System Settings uses small controls; the default size reads chunky.
+        .controlSize(.small)
     }
 }
 
