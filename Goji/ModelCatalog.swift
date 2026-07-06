@@ -91,9 +91,42 @@ final class ModelLibrary: ObservableObject {
 
     /// Fraction + label per model currently downloading.
     @Published private(set) var downloading: [SpeechModel: (fraction: Double, label: String)] = [:]
+    /// Progress of the Names & phrases booster (CTC helper model) download.
+    @Published private(set) var boosterProgress: (fraction: Double, label: String)?
     @Published private(set) var lastError: String?
     /// Bumped whenever install state changes so views re-read isInstalled.
     @Published private(set) var revision = 0
+
+    /// Downloads the small CTC helper model that powers Names & phrases
+    /// boosting at the decoder level.
+    func downloadBooster() {
+        guard boosterProgress == nil else { return }
+        lastError = nil
+        boosterProgress = (0, "Starting…")
+        Task {
+            do {
+                try await DownloadUtils.downloadRepo(.parakeetCtc110m, to: SpeechModel.modelsRoot) { progress in
+                    let label: String
+                    switch progress.phase {
+                    case .listing:
+                        label = "Contacting server…"
+                    case .downloading(let done, let total):
+                        label = "File \(min(done + 1, total)) of \(total)"
+                    case .compiling:
+                        label = "Optimizing…"
+                    }
+                    let fraction = progress.fractionCompleted
+                    Task { @MainActor [weak self] in
+                        self?.boosterProgress = (fraction, label)
+                    }
+                }
+            } catch {
+                lastError = "Enhanced recognition: \(error.localizedDescription)"
+            }
+            boosterProgress = nil
+            revision += 1
+        }
+    }
 
     func download(_ model: SpeechModel) {
         guard downloading[model] == nil else { return }
