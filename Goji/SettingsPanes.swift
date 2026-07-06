@@ -318,7 +318,9 @@ struct TranscriptionPane: View {
             return "Downloading the helper model…"
         }
         if Transcriber.boosterInstalled {
-            return "Active: your words are boosted inside the speech model itself, before any cleanup. Works with the Parakeet models."
+            return settings.enhancedRecognition
+                ? "Boosting your words inside the speech model itself, before any cleanup. Works with the Parakeet models."
+                : "Downloaded but off. Your list only informs AI cleanup until you flip this back on."
         }
         return "A one-time helper model (~150 MB) teaches the recognizer to prefer your words. Works with the Parakeet models."
     }
@@ -334,13 +336,8 @@ struct TranscriptionPane: View {
                     .foregroundStyle(.secondary)
             }
         } else if Transcriber.boosterInstalled {
-            HStack(spacing: 4) {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(Color.accentColor)
-                Text("Active")
-                    .foregroundStyle(.secondary)
-            }
-            .font(.callout)
+            Toggle("Enhanced recognition", isOn: $settings.enhancedRecognition)
+                .labelsHidden()
         } else {
             Button("Download") {
                 library.downloadBooster()
