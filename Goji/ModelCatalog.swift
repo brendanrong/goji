@@ -59,9 +59,14 @@ enum SpeechModel: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Root of FluidAudio's model cache (~/Library/Application Support/FluidAudio/Models).
+    static var modelsRoot: URL {
+        AsrModels.defaultCacheDirectory(for: .v3).deletingLastPathComponent()
+    }
+
     /// Where the model's files live in FluidAudio's cache.
     var directory: URL {
-        ModelLibrary.modelsRoot.appendingPathComponent(repo.folderName, isDirectory: true)
+        Self.modelsRoot.appendingPathComponent(repo.folderName, isDirectory: true)
     }
 
     var isInstalled: Bool {
@@ -90,17 +95,13 @@ final class ModelLibrary: ObservableObject {
     /// Bumped whenever install state changes so views re-read isInstalled.
     @Published private(set) var revision = 0
 
-    static var modelsRoot: URL {
-        AsrModels.defaultCacheDirectory(for: .v3).deletingLastPathComponent()
-    }
-
     func download(_ model: SpeechModel) {
         guard downloading[model] == nil else { return }
         lastError = nil
         downloading[model] = (0, "Starting…")
         Task {
             do {
-                try await DownloadUtils.downloadRepo(model.repo, to: Self.modelsRoot) { progress in
+                try await DownloadUtils.downloadRepo(model.repo, to: SpeechModel.modelsRoot) { progress in
                     let label: String
                     switch progress.phase {
                     case .listing:
@@ -131,12 +132,12 @@ final class ModelLibrary: ObservableObject {
     }
 
     func revealInFinder() {
-        NSWorkspace.shared.activateFileViewerSelecting([Self.modelsRoot])
+        NSWorkspace.shared.activateFileViewerSelecting([SpeechModel.modelsRoot])
     }
 
     /// Human-readable size of everything under the models folder.
     func totalSizeOnDisk() -> String {
-        let root = Self.modelsRoot
+        let root = SpeechModel.modelsRoot
         guard let enumerator = FileManager.default.enumerator(
             at: root, includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .fileAllocatedSizeKey]
         ) else { return "0 MB" }
