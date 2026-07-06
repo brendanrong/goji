@@ -32,10 +32,10 @@ Read PRD.md for scope. v1 is the core loop plus a lean settings window. Don't go
 - `SettingsControls.swift`: card/row/scaffold building blocks the panes are made of, plus FlowLayout (deliberately dumb wrapping layout) and SelectableChip.
 - `SettingsWindow.swift`: managed NSWindow that hosts SettingsView. Exists because SwiftUI's Settings scene is broken for menu bar apps on macOS 26.
 - `WelcomeWindow.swift` / `WelcomeView.swift`: first-run window. Fresh installs (no bundled or cached model) must explicitly approve the one-time ~600 MB model download; shows live progress via AppState.ModelState.downloading.
-- `HistoryStore.swift`: recent transcripts, capped at 50, local UserDefaults only. History rows offer "+" to build a replacement rule from a transcript (no learning: creates ordinary visible rules).
+- `HistoryStore.swift`: recent transcripts, capped at 500, local UserDefaults only. The pane shows 20 with Show More paging, exports all to a text file, and rows offer "+" to build a replacement rule from a transcript (no learning: creates ordinary visible rules).
 - `WordPack.swift`: shareable JSON bundle of replacements + Names & phrases; SettingsStore.exportPack()/merge() (merge-only, never deletes). The Tech Starter Pack lives at docs/tech-starter-pack.json.
 - `VariationSuggester.swift`: FoundationModels-generated mishearing suggestions for a word; human approves each before it becomes a rule.
-- `StatsStore.swift`: cumulative local dictation stats (words, seconds, streak) for the History header tiles.
+- `StatsStore.swift`: cumulative local dictation stats (words, seconds, streak) for the History header tiles, with a user-facing reset.
 - `MicDevices.swift`: CoreAudio input-device listing + UID resolution for the mic picker.
 - `Cleaner.swift`: optional on-device AI cleanup (Apple Foundation Models, macOS 26+). Takes the user's Names & phrases vocabulary and nudges close mishearings to exact spellings. Returns raw text on any failure.
 - `Sounds.swift`: start/stop cues in three packs (Minimal/Wood bundled WAVs, Classic system sounds).
