@@ -6,6 +6,7 @@ struct MenuContent: View {
     let controller: DictationController
     @ObservedObject private var settings = SettingsStore.shared
     @ObservedObject private var history = HistoryStore.shared
+    @ObservedObject private var updates = UpdateChecker.shared
 
     var body: some View {
         Group {
@@ -13,6 +14,12 @@ struct MenuContent: View {
 
             if let error = state.lastError {
                 Text("⚠︎ \(error)")
+            }
+
+            if let available = updates.availableVersion {
+                Button("Update Available: Goji \(available)…") {
+                    updates.openDownload()
+                }
             }
 
             Divider()

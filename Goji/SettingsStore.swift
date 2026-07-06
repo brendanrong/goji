@@ -188,6 +188,17 @@ final class SettingsStore: ObservableObject {
     @Published var removeTrailingFullStop: Bool {
         didSet { defaults.set(removeTrailingFullStop, forKey: Keys.removeTrailingFullStop) }
     }
+    /// Ask GitHub once a day whether a newer release exists.
+    @Published var autoCheckUpdates: Bool {
+        didSet {
+            defaults.set(autoCheckUpdates, forKey: Keys.autoCheckUpdates)
+            if autoCheckUpdates {
+                UpdateChecker.shared.startAutomaticChecks()
+            } else {
+                UpdateChecker.shared.stopAutomaticChecks()
+            }
+        }
+    }
     @Published var micDeviceUID: String? {
         didSet {
             if let micDeviceUID {
@@ -220,6 +231,7 @@ final class SettingsStore: ObservableObject {
         static let legacyMuteWhileDictating = "muteWhileDictating"
         static let cleanupEnabled = "cleanupEnabled"
         static let removeTrailingFullStop = "removeTrailingFullStop"
+        static let autoCheckUpdates = "autoCheckUpdates"
     }
 
     private init() {
@@ -244,6 +256,7 @@ final class SettingsStore: ObservableObject {
             ?? d.bool(forKey: Keys.legacyMuteWhileDictating)
         cleanupEnabled = d.bool(forKey: Keys.cleanupEnabled)
         removeTrailingFullStop = d.bool(forKey: Keys.removeTrailingFullStop)
+        autoCheckUpdates = (d.object(forKey: Keys.autoCheckUpdates) as? Bool) ?? true
         if let data = d.data(forKey: Keys.replacements),
            let rules = try? JSONDecoder().decode([ReplacementRule].self, from: data) {
             replacements = rules

@@ -40,6 +40,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     func applicationDidFinishLaunching(_ notification: Notification) {
         SettingsStore.shared.applyDockPolicy()
         SettingsStore.shared.applyAppearance()
+        if SettingsStore.shared.autoCheckUpdates {
+            UpdateChecker.shared.startAutomaticChecks()
+        }
         // Defer off the launch render pass. start() mutates @Published AppState, and
         // doing that synchronously here lands mid first-render -> SwiftUI's
         // "Publishing changes from within view updates" warning.
