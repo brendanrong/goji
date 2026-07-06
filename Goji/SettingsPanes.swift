@@ -46,15 +46,30 @@ struct GeneralPane: View {
                 }
                 Divider()
                 SettingsRow("Play start/stop sounds",
-                            subtitle: "Soft cues when recording begins and ends.") {
-                    Toggle("Play start/stop sounds", isOn: $settings.playSounds)
+                            subtitle: "Cues when recording begins and ends, in the pack of your choice.") {
+                    HStack(spacing: 10) {
+                        Picker("Sound pack", selection: $settings.soundPack) {
+                            ForEach(SoundPack.allCases) { pack in
+                                Text(pack.label).tag(pack)
+                            }
+                        }
                         .labelsHidden()
+                        .fixedSize()
+                        .disabled(!settings.playSounds)
+                        Toggle("Play start/stop sounds", isOn: $settings.playSounds)
+                            .labelsHidden()
+                    }
                 }
                 Divider()
-                SettingsRow("Pause media while dictating",
-                            subtitle: "Pauses music or video while you record and resumes it after, so nothing bleeds into the mic.") {
-                    Toggle("Pause media while dictating", isOn: $settings.pauseMediaWhileDictating)
-                        .labelsHidden()
+                SettingsRow("While dictating",
+                            subtitle: "Quieter ducks your speakers to 20% and restores them after (falls back to Pause on outputs without volume control). Pause stops music or video and resumes it.") {
+                    Picker("While dictating", selection: $settings.whileDictating) {
+                        ForEach(WhileDictating.allCases) { mode in
+                            Text(mode.label).tag(mode)
+                        }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
                 }
             }
             CaptionText(modeHint)
@@ -242,6 +257,128 @@ struct TranscriptionPane: View {
             }
             CaptionText("Applied after every transcription. Case-insensitive, whole words.")
         }
+    }
+}
+
+struct ModelsPane: View {
+    @ObservedObject private var library = ModelLibrary.shared
+
+    var body: some View {
+        PaneScaffold(title: "Models", subtitle: "The speech model that turns your voice into text") {
+            SettingsCard {
+                ForEach(Array(SpeechModel.allCases.enumerated()), id: \.element) { index, model in
+                    if index > 0 {
+                        Divider()
+                    }
+                    ModelRow(model: model)
+                }
+            }
+            if let error = library.lastError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+            CaptionText("Everything runs on this Mac. Switching models applies from your next dictation.")
+
+            SectionHeader("Storage")
+            SettingsCard {
+                SettingsRow("Models on disk",
+                            subtitle: "\(library.totalSizeOnDisk()) in Application Support > FluidAudio > Models.") {
+                    Button("Show in Finder") {
+                        library.revealInFinder()
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// One model in the list: name, badges, description, and the state control
+/// (Download with progress, Use, Remove, or In Use).
+struct ModelRow: View {
+    let model: SpeechModel
+    @ObservedObject private var settings = SettingsStore.shared
+    @ObservedObject private var library = ModelLibrary.shared
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(model.displayName)
+                        .fontWeight(.semibold)
+                    if model == .standard {
+                        TagBadge("Default")
+                    }
+                }
+                Text(model.detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("\(model.languagesLabel)  ·  \(model.approxDownload)")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            Spacer()
+            control
+        }
+        .padding(.vertical, 10)
+    }
+
+    @ViewBuilder
+    private var control: some View {
+        if let progress = library.downloading[model] {
+            VStack(alignment: .trailing, spacing: 3) {
+                ProgressView(value: progress.fraction)
+                    .frame(width: 110)
+                Text("\(Int(progress.fraction * 100))%  \(progress.label)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        } else if Transcriber.availableLocally(model) {
+            if settings.selectedModel == model {
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(Color.accentColor)
+                    Text("In Use")
+                        .foregroundStyle(.secondary)
+                }
+                .font(.callout)
+            } else {
+                HStack(spacing: 8) {
+                    Button("Use") {
+                        settings.selectedModel = model
+                    }
+                    if model.isInstalled {
+                        Button {
+                            library.remove(model)
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.borderless)
+                        .help("Remove the downloaded files")
+                    }
+                }
+            }
+        } else {
+            Button("Download") {
+                library.download(model)
+            }
+        }
+    }
+}
+
+/// Small capsule label ("Default").
+struct TagBadge: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+
+    var body: some View {
+        Text(text)
+            .font(.caption2.weight(.semibold))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Capsule().fill(Color.accentColor.opacity(0.18)))
+            .foregroundStyle(Color.accentColor)
     }
 }
 

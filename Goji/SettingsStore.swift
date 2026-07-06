@@ -94,6 +94,39 @@ enum HUDStyle: String, CaseIterable, Identifiable {
     var label: String { self == .panel ? "Panel" : "Notch" }
 }
 
+/// What happens to other audio while recording.
+enum WhileDictating: String, CaseIterable, Identifiable {
+    case nothing
+    case quieter
+    case pause
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .nothing: return "Do Nothing"
+        case .quieter: return "Quieter"
+        case .pause: return "Pause Media"
+        }
+    }
+}
+
+enum SoundPack: String, CaseIterable, Identifiable {
+    case minimal
+    case wood
+    case classic
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .minimal: return "Minimal"
+        case .wood: return "Wood"
+        case .classic: return "Classic"
+        }
+    }
+}
+
 enum AppearanceMode: String, CaseIterable, Identifiable {
     case system
     case light
@@ -176,10 +209,17 @@ final class SettingsStore: ObservableObject {
     @Published var doubleTapLock: Bool {
         didSet { defaults.set(doubleTapLock, forKey: Keys.doubleTapLock) }
     }
-    /// Pause playing media (and mute the output where the device allows it)
-    /// while recording, so audio doesn't hit the mic.
-    @Published var pauseMediaWhileDictating: Bool {
-        didSet { defaults.set(pauseMediaWhileDictating, forKey: Keys.pauseMediaWhileDictating) }
+    /// What happens to other audio while recording: nothing, duck, or pause.
+    @Published var whileDictating: WhileDictating {
+        didSet { defaults.set(whileDictating.rawValue, forKey: Keys.whileDictating) }
+    }
+    /// Which cue set plays for start/stop.
+    @Published var soundPack: SoundPack {
+        didSet { defaults.set(soundPack.rawValue, forKey: Keys.soundPack) }
+    }
+    /// Which speech model transcribes. Views only offer installed models.
+    @Published var selectedModel: SpeechModel {
+        didSet { defaults.set(selectedModel.rawValue, forKey: Keys.selectedModel) }
     }
     @Published var cleanupEnabled: Bool {
         didSet { defaults.set(cleanupEnabled, forKey: Keys.cleanupEnabled) }
@@ -227,7 +267,10 @@ final class SettingsStore: ObservableObject {
         static let micDeviceUID = "micDeviceUID"
         static let playSounds = "playSounds"
         static let doubleTapLock = "doubleTapLock"
-        static let pauseMediaWhileDictating = "pauseMediaWhileDictating"
+        static let whileDictating = "whileDictating"
+        static let soundPack = "soundPack"
+        static let selectedModel = "selectedModel"
+        static let legacyPauseMedia = "pauseMediaWhileDictating"
         static let legacyMuteWhileDictating = "muteWhileDictating"
         static let cleanupEnabled = "cleanupEnabled"
         static let removeTrailingFullStop = "removeTrailingFullStop"
@@ -252,8 +295,16 @@ final class SettingsStore: ObservableObject {
         micDeviceUID = d.string(forKey: Keys.micDeviceUID)
         playSounds = (d.object(forKey: Keys.playSounds) as? Bool) ?? true
         doubleTapLock = (d.object(forKey: Keys.doubleTapLock) as? Bool) ?? true
-        pauseMediaWhileDictating = (d.object(forKey: Keys.pauseMediaWhileDictating) as? Bool)
-            ?? d.bool(forKey: Keys.legacyMuteWhileDictating)
+        if let raw = d.string(forKey: Keys.whileDictating), let mode = WhileDictating(rawValue: raw) {
+            whileDictating = mode
+        } else {
+            // Migrate the old pause/mute toggles: on meant pause.
+            let legacyOn = (d.object(forKey: Keys.legacyPauseMedia) as? Bool)
+                ?? d.bool(forKey: Keys.legacyMuteWhileDictating)
+            whileDictating = legacyOn ? .pause : .nothing
+        }
+        soundPack = SoundPack(rawValue: d.string(forKey: Keys.soundPack) ?? "") ?? .minimal
+        selectedModel = SpeechModel(rawValue: d.string(forKey: Keys.selectedModel) ?? "") ?? .standard
         cleanupEnabled = d.bool(forKey: Keys.cleanupEnabled)
         removeTrailingFullStop = d.bool(forKey: Keys.removeTrailingFullStop)
         autoCheckUpdates = (d.object(forKey: Keys.autoCheckUpdates) as? Bool) ?? true
