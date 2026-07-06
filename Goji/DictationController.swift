@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import FluidAudio
 
 /// The brain. Wires hotkey -> recorder -> transcriber -> inserter and keeps AppState in sync.
@@ -31,6 +32,7 @@ final class DictationController {
 
     /// True when we sent play/pause at recording start, so we resume after.
     private var pausedMedia = false
+    private var cancellables = Set<AnyCancellable>()
 
     init(state: AppState) {
         self.state = state
@@ -50,7 +52,21 @@ final class DictationController {
             self?.hud.updateLevel(level)
         }
 
-        if Transcriber.modelsAvailableLocally {
+        // If the chosen model's files were removed outside the app, fall back.
+        if !Transcriber.availableLocally(settings.selectedModel), settings.selectedModel != .standard {
+            settings.selectedModel = .standard
+        }
+
+        // Live model switching from the Models pane.
+        settings.$selectedModel
+            .dropFirst()
+            .removeDuplicates()
+            .sink { [weak self] model in
+                self?.switchModel(to: model)
+            }
+            .store(in: &cancellables)
+
+        if Transcriber.modelsAvailableLocally || Transcriber.availableLocally(settings.selectedModel) {
             loadModels()
         } else {
             // Fresh install: don't pull 600 MB without asking. The welcome
@@ -60,12 +76,25 @@ final class DictationController {
         }
     }
 
+    private func switchModel(to model: SpeechModel) {
+        guard Transcriber.availableLocally(model) else { return }
+        state.modelState = .preparing("Loading \(model.displayName)…")
+        Task {
+            do {
+                try await transcriber.prepare(model: model)
+                state.modelState = .ready
+            } catch {
+                state.modelState = .failed(error.localizedDescription)
+            }
+        }
+    }
+
     /// Quiet path: the model is bundled or already cached, just load it.
     func loadModels() {
         state.modelState = .preparing("Loading speech model…")
         Task {
             do {
-                try await transcriber.prepare()
+                try await transcriber.prepare(model: settings.selectedModel)
                 state.modelState = .ready
             } catch {
                 state.modelState = .failed(error.localizedDescription)
@@ -218,16 +247,23 @@ final class DictationController {
         state.lastError = nil
         do {
             try recorder.start(deviceUID: settings.micDeviceUID)
-            if settings.pauseMediaWhileDictating {
-                // Pause the source (works on any output device), and mute the
-                // device too where it has a control. Only pause when audio is
-                // actually flowing: play/pause is a toggle and would otherwise
-                // START playback.
+            switch settings.whileDictating {
+            case .nothing:
+                break
+            case .quieter:
+                // Duck where the output has a volume control; otherwise fall
+                // back to pausing so the setting still does something useful.
+                if !SystemAudio.duckOutput(), SystemAudio.outputIsActive() {
+                    MediaKeys.playPause()
+                    pausedMedia = true
+                }
+            case .pause:
+                // Only when audio is actually flowing: play/pause is a toggle
+                // and would otherwise START playback.
                 if SystemAudio.outputIsActive() {
                     MediaKeys.playPause()
                     pausedMedia = true
                 }
-                SystemAudio.muteOutput()
             }
             state.phase = .recording
             escape.arm()
