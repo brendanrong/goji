@@ -8,7 +8,7 @@ struct GeneralPane: View {
         PaneScaffold(title: "General", subtitle: "Shortcut and app behavior") {
             SectionHeader("Dictation")
             SettingsCard {
-                SettingsRow("Recording shortcut") {
+                SettingsRow("Recording shortcut", subtitle: shortcutHint) {
                     Picker("Recording shortcut", selection: $settings.hotkeyKey) {
                         ForEach(HotkeyKey.allCases) { key in
                             Text(key.label).tag(key)
@@ -77,6 +77,12 @@ struct GeneralPane: View {
                     .foregroundStyle(.orange)
             }
         }
+    }
+
+    private var shortcutHint: String? {
+        settings.hotkeyKey == .fnGlobe
+            ? "If pressing Fn also opens emoji or switches input source, set \"Press 🌐 key to\" to \"Do Nothing\" in System Settings > Keyboard."
+            : nil
     }
 
     private var modeHint: String {

@@ -7,6 +7,9 @@ enum HotkeyKey: String, CaseIterable, Identifiable {
     case rightCommand
     case rightControl
     case leftControl
+    case fnGlobe
+    case rightShift
+    case leftShift
 
     var id: String { rawValue }
 
@@ -17,6 +20,9 @@ enum HotkeyKey: String, CaseIterable, Identifiable {
         case .rightCommand: return 54
         case .rightControl: return 62
         case .leftControl: return 59
+        case .fnGlobe: return 63
+        case .rightShift: return 60
+        case .leftShift: return 56
         }
     }
 
@@ -25,10 +31,13 @@ enum HotkeyKey: String, CaseIterable, Identifiable {
         case .rightOption, .leftOption: return .option
         case .rightCommand: return .command
         case .rightControl, .leftControl: return .control
+        case .fnGlobe: return .function
+        case .rightShift, .leftShift: return .shift
         }
     }
 
-    /// Device-dependent modifier bit, distinguishes left vs right of the same key.
+    /// Device-dependent modifier bit, distinguishes left vs right of the same
+    /// key. Fn has no left/right twin, so its plain flag bit works.
     var deviceMask: UInt {
         switch self {
         case .rightOption: return 0x40
@@ -36,6 +45,9 @@ enum HotkeyKey: String, CaseIterable, Identifiable {
         case .rightCommand: return 0x10
         case .rightControl: return 0x2000
         case .leftControl: return 0x01
+        case .fnGlobe: return NSEvent.ModifierFlags.function.rawValue
+        case .rightShift: return 0x04
+        case .leftShift: return 0x02
         }
     }
 
@@ -46,6 +58,9 @@ enum HotkeyKey: String, CaseIterable, Identifiable {
         case .rightCommand: return "Right ⌘ Command"
         case .rightControl: return "Right ⌃ Control"
         case .leftControl: return "Left ⌃ Control"
+        case .fnGlobe: return "Fn Globe"
+        case .rightShift: return "Right ⇧ Shift"
+        case .leftShift: return "Left ⇧ Shift"
         }
     }
 
@@ -56,6 +71,9 @@ enum HotkeyKey: String, CaseIterable, Identifiable {
         case .rightCommand: return "Right ⌘"
         case .rightControl: return "Right ⌃"
         case .leftControl: return "Left ⌃"
+        case .fnGlobe: return "Fn"
+        case .rightShift: return "Right ⇧"
+        case .leftShift: return "Left ⇧"
         }
     }
 }
