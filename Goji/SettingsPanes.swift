@@ -61,6 +61,18 @@ struct GeneralPane: View {
 
             SectionHeader("System")
             SettingsCard {
+                SettingsRow("Appearance",
+                            subtitle: "Follow the system, or keep Goji light or dark.") {
+                    Picker("Appearance", selection: $settings.appearance) {
+                        ForEach(AppearanceMode.allCases) { mode in
+                            Text(mode.label).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
+                }
+                Divider()
                 SettingsRow("Launch at login",
                             subtitle: "Open Goji automatically when you log in.") {
                     Toggle("Launch at login", isOn: $settings.launchAtLogin)

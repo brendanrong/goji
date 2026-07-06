@@ -94,6 +94,30 @@ enum HUDStyle: String, CaseIterable, Identifiable {
     var label: String { self == .panel ? "Panel" : "Notch" }
 }
 
+enum AppearanceMode: String, CaseIterable, Identifiable {
+    case system
+    case light
+    case dark
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .system: return "System"
+        case .light: return "Light"
+        case .dark: return "Dark"
+        }
+    }
+
+    var nsAppearance: NSAppearance? {
+        switch self {
+        case .system: return nil
+        case .light: return NSAppearance(named: .aqua)
+        case .dark: return NSAppearance(named: .darkAqua)
+        }
+    }
+}
+
 struct ReplacementRule: Codable, Identifiable, Equatable {
     var id = UUID()
     var find = ""
@@ -126,6 +150,12 @@ final class SettingsStore: ObservableObject {
     }
     @Published var hudStyle: HUDStyle {
         didSet { defaults.set(hudStyle.rawValue, forKey: Keys.hudStyle) }
+    }
+    @Published var appearance: AppearanceMode {
+        didSet {
+            defaults.set(appearance.rawValue, forKey: Keys.appearance)
+            applyAppearance()
+        }
     }
     @Published var launchAtLogin: Bool {
         didSet { applyLaunchAtLogin() }
@@ -174,6 +204,7 @@ final class SettingsStore: ObservableObject {
         static let customHotkey = "customHotkey"
         static let activationMode = "activationMode"
         static let hudStyle = "hudStyle"
+        static let appearance = "appearance"
         static let replacements = "replacements"
         static let showInMenuBar = "showInMenuBar"
         static let showInDock = "showInDock"
@@ -195,6 +226,7 @@ final class SettingsStore: ObservableObject {
         }
         activationMode = ActivationMode(rawValue: d.string(forKey: Keys.activationMode) ?? "") ?? .hold
         hudStyle = HUDStyle(rawValue: d.string(forKey: Keys.hudStyle) ?? "") ?? .panel
+        appearance = AppearanceMode(rawValue: d.string(forKey: Keys.appearance) ?? "") ?? .system
         launchAtLogin = SMAppService.mainApp.status == .enabled
         showInMenuBar = (d.object(forKey: Keys.showInMenuBar) as? Bool) ?? true
         showInDock = (d.object(forKey: Keys.showInDock) as? Bool) ?? true
@@ -259,6 +291,11 @@ final class SettingsStore: ObservableObject {
     /// this flips it at runtime based on the user's preference.
     func applyDockPolicy() {
         NSApp.setActivationPolicy(showInDock ? .regular : .accessory)
+    }
+
+    /// Forces light/dark app-wide, or follows the system when .system.
+    func applyAppearance() {
+        NSApp.appearance = appearance.nsAppearance
     }
 
     private func applyLaunchAtLogin() {
