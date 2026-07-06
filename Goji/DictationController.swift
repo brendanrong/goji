@@ -192,6 +192,13 @@ final class DictationController {
         DispatchQueue.main.asyncAfter(deadline: .now() + doubleTapWindow, execute: work)
     }
 
+    /// Drops exactly one final period. Leaves "?", "!", and "..." alone, and
+    /// only touches the very end of the transcript.
+    static func strippingTrailingFullStop(_ text: String) -> String {
+        guard text.hasSuffix("."), !text.hasSuffix("..") else { return text }
+        return String(text.dropLast())
+    }
+
     private func resumeMediaIfPaused() {
         guard pausedMedia else { return }
         pausedMedia = false
@@ -267,6 +274,9 @@ final class DictationController {
                     cleaned = await Cleaner.cleanup(cleaned)
                 }
                 cleaned = settings.applyReplacements(to: cleaned)
+                if settings.removeTrailingFullStop {
+                    cleaned = Self.strippingTrailingFullStop(cleaned)
+                }
                 guard !cleaned.isEmpty else { return }
 
                 state.lastTranscript = cleaned
