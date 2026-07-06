@@ -157,11 +157,13 @@ struct ReplacementRule: Codable, Identifiable, Equatable {
     var replace = ""
 }
 
-/// A name or term the speaker uses; AI cleanup nudges close mishearings to
-/// these exact spellings. Later feeds decoder-level vocabulary biasing too.
+/// A name or term the speaker uses. Enhanced recognition boosts it inside the
+/// speech model, AI cleanup nudges toward it, and learned aliases record the
+/// specific mishearings the user has corrected in History.
 struct VocabWord: Codable, Identifiable, Equatable {
     var id = UUID()
     var text = ""
+    var aliases: [String]? = nil
 }
 
 /// A user-recorded combination of modifier keys (e.g. Fn + Right ⌃).
@@ -272,6 +274,41 @@ final class SettingsStore: ObservableObject {
         vocabulary
             .map { $0.text.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
+    }
+
+    /// Cleanup-prompt lines including learned mishearings, e.g.
+    /// "Jachin (often misheard as: Jaken, Jacan)".
+    var vocabularyPromptLines: [String] {
+        vocabulary.compactMap { word in
+            let text = word.text.trimmingCharacters(in: .whitespaces)
+            guard !text.isEmpty else { return nil }
+            let aliases = (word.aliases ?? []).filter { !$0.isEmpty }
+            guard !aliases.isEmpty else { return text }
+            return "\(text) (often misheard as: \(aliases.joined(separator: ", ")))"
+        }
+    }
+
+    /// Folds corrections from a History fix into the vocabulary: the right
+    /// spelling becomes (or updates) an entry, the mishearing becomes an alias.
+    func learn(_ corrections: [(wrong: String, right: String)]) {
+        guard !corrections.isEmpty else { return }
+        var words = vocabulary
+        for correction in corrections {
+            let right = correction.right.trimmingCharacters(in: .whitespaces)
+            let wrong = correction.wrong.trimmingCharacters(in: .whitespaces)
+            guard right.count >= 2, !wrong.isEmpty,
+                  wrong.lowercased() != right.lowercased() else { continue }
+
+            if let index = words.firstIndex(where: { $0.text.compare(right, options: .caseInsensitive) == .orderedSame }) {
+                var aliases = words[index].aliases ?? []
+                guard !aliases.contains(where: { $0.compare(wrong, options: .caseInsensitive) == .orderedSame }) else { continue }
+                aliases.append(wrong)
+                words[index].aliases = Array(aliases.suffix(8))
+            } else {
+                words.append(VocabWord(text: right, aliases: [wrong]))
+            }
+        }
+        vocabulary = words
     }
 
     private let defaults = UserDefaults.standard
