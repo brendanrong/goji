@@ -21,6 +21,7 @@ Read PRD.md for scope. v1 is the core loop plus a lean settings window. Don't go
 - `EscapeInterceptor.swift`: CGEventTap that swallows Esc, armed only while recording, so cancelling a dictation doesn't leak Esc into the frontmost app.
 - `AudioRecorder.swift`: AVAudioEngine tap, converts to 16 kHz mono Float32.
 - `Transcriber.swift`: FluidAudio AsrManager wrapper (actor).
+- `ModelFetcher.swift`: first-run model download as ONE zip from the GitHub `models-v3` release (fast CDN, real progress) into FluidAudio's cache; DictationController falls back to FluidAudio's HuggingFace crawl if it fails. The models-v3 release must be created with `--latest=false` or the site's releases/latest/download/Goji.dmg link breaks.
 - `TextInserter.swift`: pasteboard swap + synthetic Cmd+V, restores clipboard after 1 s (Electron paste handlers read it late).
 - `HUD.swift`: HUDController, places the indicator (bottom panel, notch extension; synthetic notch island on notchless displays).
 - `HUDViews.swift`: the SwiftUI indicator views (capsule + notch shapes).
