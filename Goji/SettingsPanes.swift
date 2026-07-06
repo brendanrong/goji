@@ -266,8 +266,8 @@ struct ModelsPane: View {
     var body: some View {
         PaneScaffold(title: "Models", subtitle: "The speech model that turns your voice into text") {
             SettingsCard {
-                ForEach(Array(SpeechModel.allCases.enumerated()), id: \.element) { index, model in
-                    if index > 0 {
+                ForEach(SpeechModel.allCases) { model in
+                    if model != SpeechModel.allCases.first {
                         Divider()
                     }
                     ModelRow(model: model)
