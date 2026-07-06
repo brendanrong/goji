@@ -27,14 +27,14 @@ Read PRD.md for scope. v1 is the core loop plus a lean settings window. Don't go
 - `HUD.swift`: HUDController, places the indicator (bottom panel, notch extension; synthetic notch island on notchless displays).
 - `HUDViews.swift`: the SwiftUI indicator views (capsule + notch shapes).
 - `SettingsStore.swift`: user prefs (hotkey, hold/toggle, HUD style, login item, replacements). UserDefaults-backed, applied live, no restart needed.
-- `SettingsView.swift`: settings shell — sidebar navigation (General/Microphone/Transcription/Models/History/About) + detail pane.
+- `SettingsView.swift`: settings shell — sidebar navigation (General/Transcription/Models/History/About) + detail pane. Microphone lives inside General.
 - `SettingsPanes.swift`: the individual settings panes and the mic test preview.
 - `SettingsControls.swift`: card/row/scaffold building blocks the panes are made of.
 - `SettingsWindow.swift`: managed NSWindow that hosts SettingsView. Exists because SwiftUI's Settings scene is broken for menu bar apps on macOS 26.
 - `WelcomeWindow.swift` / `WelcomeView.swift`: first-run window. Fresh installs (no bundled or cached model) must explicitly approve the one-time ~600 MB model download; shows live progress via AppState.ModelState.downloading.
 - `HistoryStore.swift`: recent transcripts, capped at 50, local UserDefaults only.
 - `MicDevices.swift`: CoreAudio input-device listing + UID resolution for the mic picker.
-- `Cleaner.swift`: optional on-device AI cleanup (Apple Foundation Models, macOS 26+). Returns raw text on any failure.
+- `Cleaner.swift`: optional on-device AI cleanup (Apple Foundation Models, macOS 26+). Takes the user's Names & phrases vocabulary and nudges close mishearings to exact spellings. Returns raw text on any failure.
 - `Sounds.swift`: start/stop cues in three packs (Minimal/Wood bundled WAVs, Classic system sounds).
 - `SystemAudio.swift`: CoreAudio duck-to-20%/restore of the default output + outputIsActive() check (HDMI/DP monitors often expose no volume control, so ducking falls back to media pause).
 - `MediaKeys.swift`: synthetic play/pause media key (F8). Pauses/resumes whatever owns Now Playing while dictating; only sent when audio is flowing because it's a blind toggle.
