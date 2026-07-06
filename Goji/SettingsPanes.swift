@@ -576,6 +576,12 @@ struct TagBadge: View {
 
 struct HistoryPane: View {
     @ObservedObject private var history = HistoryStore.shared
+    @ObservedObject private var settings = SettingsStore.shared
+    @State private var expandedID: UUID?
+    @State private var selection: ClosedRange<Int>?
+    @State private var replaceWith = ""
+    @State private var addToNames = true
+    @State private var ruleNote: String?
 
     var body: some View {
         PaneScaffold(title: "History", subtitle: "Recent transcripts, stored only on this Mac") {
@@ -588,20 +594,10 @@ struct HistoryPane: View {
             } else {
                 SettingsCard {
                     ForEach(history.items.prefix(8)) { item in
-                        HStack(alignment: .top) {
-                            Text(item.text)
-                                .lineLimit(2)
-                            Spacer()
-                            Button {
-                                NSPasteboard.general.clearContents()
-                                NSPasteboard.general.setString(item.text, forType: .string)
-                            } label: {
-                                Image(systemName: "doc.on.doc")
-                            }
-                            .buttonStyle(.borderless)
-                            .help("Copy")
+                        row(for: item)
+                        if expandedID == item.id {
+                            ruleEditor(for: item)
                         }
-                        .padding(.vertical, 8)
                         Divider()
                     }
                     SettingsRow("Remove all transcripts") {
@@ -610,8 +606,132 @@ struct HistoryPane: View {
                         }
                     }
                 }
+                if let ruleNote {
+                    Text(ruleNote)
+                        .font(.caption)
+                        .foregroundStyle(Color.accentColor)
+                }
+                CaptionText("Spot a wrong word? Hit the + on its transcript, click the word, type the fix. It becomes an ordinary Word replacement you can see and delete in Transcription.")
             }
         }
+    }
+
+    private func row(for item: HistoryItem) -> some View {
+        HStack(alignment: .top) {
+            Text(item.text)
+                .lineLimit(2)
+            Spacer()
+            Button {
+                if expandedID == item.id {
+                    collapse()
+                } else {
+                    expandedID = item.id
+                    selection = nil
+                    replaceWith = ""
+                    addToNames = true
+                    ruleNote = nil
+                }
+            } label: {
+                Image(systemName: expandedID == item.id ? "minus.circle" : "plus.circle")
+            }
+            .buttonStyle(.borderless)
+            .help("Make a replacement rule from this transcript")
+            Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(item.text, forType: .string)
+            } label: {
+                Image(systemName: "doc.on.doc")
+            }
+            .buttonStyle(.borderless)
+            .help("Copy")
+        }
+        .padding(.vertical, 8)
+    }
+
+    private func ruleEditor(for item: HistoryItem) -> some View {
+        let words = item.text.split(whereSeparator: \.isWhitespace).map(String.init)
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("Click the words that came out wrong:")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            FlowLayout(spacing: 6) {
+                ForEach(words.indices, id: \.self) { index in
+                    SelectableChip(text: words[index], isOn: isSelected(index)) {
+                        tapWord(index)
+                    }
+                }
+            }
+            HStack(spacing: 10) {
+                Text("Replace \"\(selectedText(in: words))\" with")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .opacity(selection == nil ? 0.4 : 1)
+                TextField("Correct word", text: $replaceWith)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 160)
+                Toggle("add to Names & phrases", isOn: $addToNames)
+                    .toggleStyle(.checkbox)
+                    .font(.caption)
+            }
+            HStack(spacing: 8) {
+                Button("Add Rule") {
+                    addRule(words: words)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(selection == nil || replaceWith.trimmingCharacters(in: .whitespaces).isEmpty)
+                Button("Cancel") {
+                    collapse()
+                }
+            }
+        }
+        .padding(.bottom, 10)
+    }
+
+    private func isSelected(_ index: Int) -> Bool {
+        selection?.contains(index) ?? false
+    }
+
+    /// Tap selects a word; tapping a neighbor extends the run; anything else
+    /// restarts the selection.
+    private func tapWord(_ index: Int) {
+        if let current = selection {
+            if index == current.upperBound + 1 {
+                selection = current.lowerBound...index
+            } else if index == current.lowerBound - 1 {
+                selection = index...current.upperBound
+            } else if current.contains(index), current.count == 1 {
+                selection = nil
+            } else {
+                selection = index...index
+            }
+        } else {
+            selection = index...index
+        }
+    }
+
+    private func selectedText(in words: [String]) -> String {
+        guard let selection else { return "…" }
+        return words[selection]
+            .joined(separator: " ")
+            .trimmingCharacters(in: .punctuationCharacters)
+    }
+
+    private func addRule(words: [String]) {
+        let find = selectedText(in: words)
+        let replace = replaceWith.trimmingCharacters(in: .whitespaces)
+        guard !find.isEmpty, find != "…", !replace.isEmpty else { return }
+        settings.replacements.append(ReplacementRule(find: find, replace: replace))
+        if addToNames, !settings.vocabulary.contains(where: { $0.text.compare(replace, options: .caseInsensitive) == .orderedSame }) {
+            settings.vocabulary.append(VocabWord(text: replace))
+        }
+        collapse()
+        ruleNote = "Rule added: \(find) → \(replace)"
+    }
+
+    private func collapse() {
+        expandedID = nil
+        selection = nil
+        replaceWith = ""
     }
 }
 
