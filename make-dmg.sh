@@ -28,7 +28,8 @@ xcodebuild -scheme Goji -configuration Release -derivedDataPath "$DERIVED" build
 APP="$DERIVED/Build/Products/Release/Goji.app"
 
 if [[ "${BUNDLE_MODEL:-0}" == "1" ]]; then
-  MODEL_SRC="$HOME/Library/Application Support/FluidAudio/Models/parakeet-tdt-0.6b-v3-coreml"
+  # FluidAudio's cache folder drops the -coreml suffix from the repo name.
+  MODEL_SRC="$HOME/Library/Application Support/FluidAudio/Models/parakeet-tdt-0.6b-v3"
   if [[ ! -d "$MODEL_SRC" ]]; then
     echo "No local model at: $MODEL_SRC"
     echo "Run Goji once so it downloads the model, then retry."
