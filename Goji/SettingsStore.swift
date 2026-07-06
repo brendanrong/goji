@@ -184,6 +184,10 @@ final class SettingsStore: ObservableObject {
     @Published var cleanupEnabled: Bool {
         didSet { defaults.set(cleanupEnabled, forKey: Keys.cleanupEnabled) }
     }
+    /// Drop the final period the model tacks onto every utterance.
+    @Published var removeTrailingFullStop: Bool {
+        didSet { defaults.set(removeTrailingFullStop, forKey: Keys.removeTrailingFullStop) }
+    }
     @Published var micDeviceUID: String? {
         didSet {
             if let micDeviceUID {
@@ -215,6 +219,7 @@ final class SettingsStore: ObservableObject {
         static let pauseMediaWhileDictating = "pauseMediaWhileDictating"
         static let legacyMuteWhileDictating = "muteWhileDictating"
         static let cleanupEnabled = "cleanupEnabled"
+        static let removeTrailingFullStop = "removeTrailingFullStop"
     }
 
     private init() {
@@ -238,6 +243,7 @@ final class SettingsStore: ObservableObject {
         pauseMediaWhileDictating = (d.object(forKey: Keys.pauseMediaWhileDictating) as? Bool)
             ?? d.bool(forKey: Keys.legacyMuteWhileDictating)
         cleanupEnabled = d.bool(forKey: Keys.cleanupEnabled)
+        removeTrailingFullStop = d.bool(forKey: Keys.removeTrailingFullStop)
         if let data = d.data(forKey: Keys.replacements),
            let rules = try? JSONDecoder().decode([ReplacementRule].self, from: data) {
             replacements = rules

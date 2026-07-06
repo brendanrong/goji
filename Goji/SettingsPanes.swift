@@ -204,6 +204,15 @@ struct TranscriptionPane: View {
             CaptionText(Cleaner.unavailabilityHint
                 ?? "Removes filler words, applies self-corrections like 'scratch that', and turns 'new line' into a real line break. Runs entirely on this Mac.")
 
+            SectionHeader("Formatting")
+            SettingsCard {
+                SettingsRow("Remove the full stop at the end",
+                            subtitle: "Drops the final period the model adds to every dictation. Question marks and exclamations stay.") {
+                    Toggle("Remove the full stop at the end", isOn: $settings.removeTrailingFullStop)
+                        .labelsHidden()
+                }
+            }
+
             SectionHeader("Word replacements")
             SettingsCard {
                 ForEach($settings.replacements) { $rule in
