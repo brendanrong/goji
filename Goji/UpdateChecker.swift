@@ -12,6 +12,9 @@ final class UpdateChecker: ObservableObject {
     /// Version string like "1.0.8" when something newer exists, nil when current.
     @Published private(set) var availableVersion: String?
     @Published private(set) var checking = false
+    /// True when the last check couldn't reach GitHub, so "no update" isn't
+    /// silently conflated with "couldn't check".
+    @Published private(set) var lastCheckFailed = false
 
     static let downloadURL = URL(string: "https://github.com/brendanrong/goji/releases/latest/download/Goji.dmg")!
     private static let apiURL = URL(string: "https://api.github.com/repos/brendanrong/goji/releases/latest")!
@@ -49,8 +52,12 @@ final class UpdateChecker: ObservableObject {
         guard let (data, response) = try? await URLSession.shared.data(for: request),
               (response as? HTTPURLResponse)?.statusCode == 200,
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let tag = json["tag_name"] as? String else { return }
+              let tag = json["tag_name"] as? String else {
+            lastCheckFailed = true
+            return
+        }
 
+        lastCheckFailed = false
         let latest = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
         availableVersion = Self.isNewer(latest, than: Self.currentVersion) ? latest : nil
     }
