@@ -29,10 +29,13 @@ Read PRD.md for scope. v1 is the core loop plus a lean settings window. Don't go
 - `SettingsStore.swift`: user prefs (hotkey, hold/toggle, HUD style, login item, replacements). UserDefaults-backed, applied live, no restart needed.
 - `SettingsView.swift`: settings shell — sidebar navigation (General/Transcription/Models/History/About) + detail pane. Microphone lives inside General.
 - `SettingsPanes.swift`: the individual settings panes and the mic test preview.
-- `SettingsControls.swift`: card/row/scaffold building blocks the panes are made of.
+- `SettingsControls.swift`: card/row/scaffold building blocks the panes are made of, plus FlowLayout (deliberately dumb wrapping layout) and SelectableChip.
 - `SettingsWindow.swift`: managed NSWindow that hosts SettingsView. Exists because SwiftUI's Settings scene is broken for menu bar apps on macOS 26.
 - `WelcomeWindow.swift` / `WelcomeView.swift`: first-run window. Fresh installs (no bundled or cached model) must explicitly approve the one-time ~600 MB model download; shows live progress via AppState.ModelState.downloading.
-- `HistoryStore.swift`: recent transcripts, capped at 50, local UserDefaults only.
+- `HistoryStore.swift`: recent transcripts, capped at 50, local UserDefaults only. History rows offer "+" to build a replacement rule from a transcript (no learning: creates ordinary visible rules).
+- `WordPack.swift`: shareable JSON bundle of replacements + Names & phrases; SettingsStore.exportPack()/merge() (merge-only, never deletes). The Tech Starter Pack lives at docs/tech-starter-pack.json.
+- `VariationSuggester.swift`: FoundationModels-generated mishearing suggestions for a word; human approves each before it becomes a rule.
+- `StatsStore.swift`: cumulative local dictation stats (words, seconds, streak) for the History header tiles.
 - `MicDevices.swift`: CoreAudio input-device listing + UID resolution for the mic picker.
 - `Cleaner.swift`: optional on-device AI cleanup (Apple Foundation Models, macOS 26+). Takes the user's Names & phrases vocabulary and nudges close mishearings to exact spellings. Returns raw text on any failure.
 - `Sounds.swift`: start/stop cues in three packs (Minimal/Wood bundled WAVs, Classic system sounds).
