@@ -307,7 +307,7 @@ final class DictationController {
                 guard !cleaned.isEmpty else { return }
 
                 if settings.cleanupEnabled {
-                    cleaned = await Cleaner.cleanup(cleaned)
+                    cleaned = await Cleaner.cleanup(cleaned, vocabulary: settings.vocabularyTerms)
                 }
                 cleaned = settings.applyReplacements(to: cleaned)
                 if settings.removeTrailingFullStop {
