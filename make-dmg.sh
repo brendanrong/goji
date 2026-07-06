@@ -53,14 +53,49 @@ codesign --force --options runtime --timestamp \
 codesign --verify --deep --strict "$APP"
 echo "Signed with: $IDENTITY"
 
-# Stage the app next to an /Applications symlink so the mounted DMG offers
-# the standard drag-to-install target.
+# Stage the app next to an /Applications symlink plus the background art,
+# then script Finder to lay the window out LiveWall-style: Goji on the left,
+# arrow, Applications on the right, drag instructions underneath.
 STAGING=/tmp/goji-dmg
 rm -rf "$STAGING"
-mkdir -p "$STAGING"
+mkdir -p "$STAGING/.background"
 ditto "$APP" "$STAGING/Goji.app"
 ln -s /Applications "$STAGING/Applications"
-hdiutil create -volname Goji -srcfolder "$STAGING" -ov -format UDZO dist/Goji.dmg
+cp dmg-background.png "$STAGING/.background/background.png"
+
+RW=/tmp/goji-rw.dmg
+rm -f "$RW"
+hdiutil detach /Volumes/Goji >/dev/null 2>&1 || true
+hdiutil create -volname Goji -srcfolder "$STAGING" -ov -format UDRW -fs HFS+ "$RW"
+hdiutil attach -readwrite -noverify -noautoopen "$RW" >/dev/null
+
+# First run: macOS asks to let Terminal control Finder. Allow it, then rerun
+# if the layout step got skipped.
+osascript <<'OSA'
+tell application "Finder"
+  tell disk "Goji"
+    open
+    set current view of container window to icon view
+    set toolbar visible of container window to false
+    set statusbar visible of container window to false
+    set the bounds of container window to {200, 120, 860, 520}
+    set viewOptions to the icon view options of container window
+    set arrangement of viewOptions to not arranged
+    set icon size of viewOptions to 100
+    set background picture of viewOptions to file ".background:background.png"
+    set position of item "Goji.app" of container window to {165, 175}
+    set position of item "Applications" of container window to {495, 175}
+    update without registering applications
+    delay 1
+    close
+  end tell
+end tell
+OSA
+
+sync
+hdiutil detach /Volumes/Goji
+hdiutil convert "$RW" -format UDZO -imagekey zlib-level=9 -ov -o dist/Goji.dmg
+rm -f "$RW"
 
 if [[ "${NOTARIZE:-0}" == "1" ]]; then
   xcrun notarytool submit dist/Goji.dmg --keychain-profile "$NOTARY_PROFILE" --wait
