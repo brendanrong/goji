@@ -55,6 +55,15 @@ final class StatsStore: ObservableObject {
         return Int((Double(totalWords) / (totalRecordSeconds / 60.0)).rounded())
     }
 
+    /// Back to zero: words, time, streak, all of it.
+    func reset() {
+        totalWords = 0
+        totalRecordSeconds = 0
+        streakDays = 0
+        lastUseDay = ""
+        persist()
+    }
+
     private func persist() {
         let d = UserDefaults.standard
         d.set(totalWords, forKey: Keys.words)
