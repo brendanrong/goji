@@ -1,11 +1,11 @@
 import AppKit
 
-/// Global monitors for the dictation key (a single modifier, read live from
-/// SettingsStore). Emits raw down/up transitions; DictationController decides
-/// what they mean based on Hold vs Toggle mode. Esc handling lives in
-/// EscapeInterceptor (it must consume the event, which monitors can't).
-/// Global NSEvent monitors only deliver events once Accessibility is granted,
-/// which Goji needs anyway to paste.
+/// Global monitors for the dictation shortcut (a preset modifier key or a
+/// recorded combo of modifiers, read live from SettingsStore). Emits raw
+/// down/up transitions; DictationController decides what they mean based on
+/// Hold vs Toggle mode. Esc handling lives in EscapeInterceptor (it must
+/// consume the event, which monitors can't). Global NSEvent monitors only
+/// deliver events once Accessibility is granted, which Goji needs anyway to paste.
 @MainActor
 final class HotkeyMonitor {
     var onHotkeyDown: (() -> Void)?
@@ -13,7 +13,7 @@ final class HotkeyMonitor {
 
     private var monitors: [Any] = []
     private var keyIsDown = false
-    private var downKeyCode: UInt16?
+    private var armedMask: UInt = 0
 
     func start() {
         guard monitors.isEmpty else { return }
@@ -37,32 +37,36 @@ final class HotkeyMonitor {
         monitors.forEach { NSEvent.removeMonitor($0) }
         monitors.removeAll()
         keyIsDown = false
-        downKeyCode = nil
+        armedMask = 0
     }
 
     private func handleFlags(_ event: NSEvent) {
-        let key = SettingsStore.shared.hotkeyKey
+        // The recorder in Settings owns the keyboard while capturing a combo.
+        guard !HotkeyRecorder.isRecording else { return }
 
-        // If the configured key changed while the old one was down, treat it as released.
-        if keyIsDown, let down = downKeyCode, down != key.keyCode {
+        let required = SettingsStore.shared.effectiveHotkeyMask
+        guard required != 0 else { return }
+
+        // If the configured shortcut changed while the old one was down,
+        // treat the old one as released.
+        if keyIsDown, armedMask != required {
             keyIsDown = false
-            downKeyCode = nil
+            armedMask = 0
             onHotkeyUp?()
             return
         }
 
-        guard event.keyCode == key.keyCode else { return }
-        // Use the device-dependent mask (distinguishes left vs right) so holding
-        // the other Option/Control key can't mask this key's release.
-        let pressed = (event.modifierFlags.rawValue & key.deviceMask) != 0
+        // Down when every required bit is held together (device-dependent
+        // masks distinguish left from right), up as soon as any is released.
+        let pressed = (event.modifierFlags.rawValue & required) == required
 
         if pressed && !keyIsDown {
             keyIsDown = true
-            downKeyCode = key.keyCode
+            armedMask = required
             onHotkeyDown?()
         } else if !pressed && keyIsDown {
             keyIsDown = false
-            downKeyCode = nil
+            armedMask = 0
             onHotkeyUp?()
         }
     }

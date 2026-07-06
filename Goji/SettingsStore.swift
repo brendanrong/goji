@@ -100,6 +100,15 @@ struct ReplacementRule: Codable, Identifiable, Equatable {
     var replace = ""
 }
 
+/// A user-recorded combination of modifier keys (e.g. Fn + Right ⌃).
+/// deviceMask is the union of the required bits; all must be held together.
+/// A zero mask means "selected Custom but nothing recorded yet" and falls
+/// back to the preset key.
+struct CustomHotkey: Codable, Equatable {
+    var deviceMask: UInt = 0
+    var label: String = ""
+}
+
 /// All user preferences. UserDefaults-backed, applied live (no restart needed).
 @MainActor
 final class SettingsStore: ObservableObject {
@@ -107,6 +116,10 @@ final class SettingsStore: ObservableObject {
 
     @Published var hotkeyKey: HotkeyKey {
         didSet { defaults.set(hotkeyKey.rawValue, forKey: Keys.hotkeyKey) }
+    }
+    /// Non-nil with a non-zero mask overrides hotkeyKey with a recorded combo.
+    @Published var customHotkey: CustomHotkey? {
+        didSet { persistCustomHotkey() }
     }
     @Published var activationMode: ActivationMode {
         didSet { defaults.set(activationMode.rawValue, forKey: Keys.activationMode) }
@@ -158,6 +171,7 @@ final class SettingsStore: ObservableObject {
 
     private enum Keys {
         static let hotkeyKey = "hotkeyKey"
+        static let customHotkey = "customHotkey"
         static let activationMode = "activationMode"
         static let hudStyle = "hudStyle"
         static let replacements = "replacements"
@@ -173,6 +187,12 @@ final class SettingsStore: ObservableObject {
     private init() {
         let d = UserDefaults.standard
         hotkeyKey = HotkeyKey(rawValue: d.string(forKey: Keys.hotkeyKey) ?? "") ?? .rightOption
+        if let data = d.data(forKey: Keys.customHotkey),
+           let hotkey = try? JSONDecoder().decode(CustomHotkey.self, from: data) {
+            customHotkey = hotkey
+        } else {
+            customHotkey = nil
+        }
         activationMode = ActivationMode(rawValue: d.string(forKey: Keys.activationMode) ?? "") ?? .hold
         hudStyle = HUDStyle(rawValue: d.string(forKey: Keys.hudStyle) ?? "") ?? .panel
         launchAtLogin = SMAppService.mainApp.status == .enabled
@@ -188,6 +208,30 @@ final class SettingsStore: ObservableObject {
             replacements = rules
         } else {
             replacements = []
+        }
+    }
+
+    /// The modifier bits the hotkey monitor must see held simultaneously.
+    var effectiveHotkeyMask: UInt {
+        if let customHotkey, customHotkey.deviceMask != 0 {
+            return customHotkey.deviceMask
+        }
+        return hotkeyKey.deviceMask
+    }
+
+    /// What the shortcut is called in hints: "Right ⌥" or "Fn + Right ⌃".
+    var hotkeyDisplay: String {
+        if let customHotkey, customHotkey.deviceMask != 0 {
+            return customHotkey.label
+        }
+        return hotkeyKey.shortLabel
+    }
+
+    private func persistCustomHotkey() {
+        if let customHotkey, let data = try? JSONEncoder().encode(customHotkey) {
+            defaults.set(data, forKey: Keys.customHotkey)
+        } else {
+            defaults.removeObject(forKey: Keys.customHotkey)
         }
     }
 

@@ -9,13 +9,21 @@ struct GeneralPane: View {
             SectionHeader("Dictation")
             SettingsCard {
                 SettingsRow("Recording shortcut", subtitle: shortcutHint) {
-                    Picker("Recording shortcut", selection: $settings.hotkeyKey) {
+                    Picker("Recording shortcut", selection: hotkeyChoice) {
                         ForEach(HotkeyKey.allCases) { key in
-                            Text(key.label).tag(key)
+                            Text(key.label).tag(HotkeyChoice.preset(key))
                         }
+                        Text("Custom Combo…").tag(HotkeyChoice.custom)
                     }
                     .labelsHidden()
                     .fixedSize()
+                }
+                if settings.customHotkey != nil {
+                    Divider()
+                    SettingsRow("Custom combo",
+                                subtitle: "Click record, hold any mix of Fn ⌃ ⌥ ⌘ ⇧ (left and right count as different keys), then release.") {
+                        HotkeyRecorder()
+                    }
                 }
                 Divider()
                 SettingsRow("Mode") {
@@ -79,8 +87,27 @@ struct GeneralPane: View {
         }
     }
 
+    private var hotkeyChoice: Binding<HotkeyChoice> {
+        Binding(
+            get: {
+                settings.customHotkey != nil ? .custom : .preset(settings.hotkeyKey)
+            },
+            set: { choice in
+                switch choice {
+                case .preset(let key):
+                    settings.customHotkey = nil
+                    settings.hotkeyKey = key
+                case .custom:
+                    if settings.customHotkey == nil {
+                        settings.customHotkey = CustomHotkey()
+                    }
+                }
+            }
+        )
+    }
+
     private var shortcutHint: String? {
-        settings.hotkeyKey == .fnGlobe
+        (settings.effectiveHotkeyMask & NSEvent.ModifierFlags.function.rawValue) != 0
             ? "If pressing Fn also opens emoji or switches input source, set \"Press 🌐 key to\" to \"Do Nothing\" in System Settings > Keyboard."
             : nil
     }
@@ -89,12 +116,18 @@ struct GeneralPane: View {
         switch settings.activationMode {
         case .hold:
             return settings.doubleTapLock
-                ? "Hold \(settings.hotkeyKey.shortLabel), speak, release. Double-tap to keep recording hands-free, tap again to finish. Esc cancels."
-                : "Hold \(settings.hotkeyKey.shortLabel), speak, release. Esc cancels."
+                ? "Hold \(settings.hotkeyDisplay), speak, release. Double-tap to keep recording hands-free, tap again to finish. Esc cancels."
+                : "Hold \(settings.hotkeyDisplay), speak, release. Esc cancels."
         case .toggle:
-            return "Tap \(settings.hotkeyKey.shortLabel) to start, tap again to finish. Esc cancels."
+            return "Tap \(settings.hotkeyDisplay) to start, tap again to finish. Esc cancels."
         }
     }
+}
+
+/// Picker selection for the shortcut row: one of the presets, or a recorded combo.
+enum HotkeyChoice: Hashable {
+    case preset(HotkeyKey)
+    case custom
 }
 
 struct MicrophonePane: View {
