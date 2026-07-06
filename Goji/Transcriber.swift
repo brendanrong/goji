@@ -62,7 +62,10 @@ actor Transcriber {
             }
             guard !tokenized.isEmpty else { return }
 
-            let context = CustomVocabularyContext(terms: tokenized)
+            // Precision over recall: the library's defaults (similarity 0.50,
+            // heavy bias) happily turn everyday words into vocabulary terms.
+            // A missed boost is mildly annoying; a false one is corrosive.
+            let context = CustomVocabularyContext(terms: tokenized, minSimilarity: 0.72)
             let spot = CtcKeywordSpotter(models: models, blankId: models.vocabulary.count)
             rescorer = try await VocabularyRescorer.create(
                 spotter: spot,
@@ -89,17 +92,26 @@ actor Transcriber {
             audioSamples: samples, customVocabulary: vocabContext, minScore: nil
         ), !spotResult.logProbs.isEmpty else { return text }
 
-        let config = ContextBiasingConstants.rescorerConfig(forVocabSize: vocabContext.terms.count)
+        // Conservative dials: default bias weight (not the 4.5 the size-based
+        // config suggests) and a high similarity bar.
         let output = rescorer.ctcTokenRescore(
             transcript: text,
             tokenTimings: timings,
             logProbs: spotResult.logProbs,
             frameDuration: spotResult.frameDuration,
-            cbw: config.cbw,
+            cbw: ContextBiasingConstants.defaultCbw,
             marginSeconds: 0.5,
-            minSimilarity: max(config.minSimilarity, vocabContext.minSimilarity)
+            minSimilarity: max(0.72, vocabContext.minSimilarity)
         )
-        return output.wasModified ? output.text : text
+        guard output.wasModified else { return text }
+
+        // Sanity guard: if the rescorer wants to rewrite a big chunk of the
+        // sentence into vocabulary terms, it has gone rogue. Keep the original.
+        let wordCount = max(text.split(whereSeparator: \.isWhitespace).count, 1)
+        let replacedCount = output.replacements.filter { $0.shouldReplace }.count
+        guard replacedCount <= max(2, wordCount / 5) else { return text }
+
+        return output.text
     }
 
     /// True when the given model needs no download: bundled inside the app
