@@ -40,7 +40,6 @@ final class DictationController {
 
     func start() {
         Permissions.requestMicrophone()
-        refreshAccessibility(prompt: true)
 
         hotkey.onHotkeyDown = { [weak self] in self?.hotkeyDown() }
         hotkey.onHotkeyUp = { [weak self] in self?.hotkeyUp() }
@@ -67,10 +66,15 @@ final class DictationController {
             .store(in: &cancellables)
 
         if Transcriber.modelsAvailableLocally || Transcriber.availableLocally(settings.selectedModel) {
+            // Returning user: mic is long granted, so this prompt (which only
+            // fires when NOT yet trusted) has the stage to itself.
+            refreshAccessibility(prompt: true)
             loadModels()
         } else {
-            // Fresh install: don't pull 600 MB without asking. The welcome
-            // window explains and offers the download.
+            // Fresh install: don't pull 600 MB without asking, and don't stack
+            // a third dialog on top of the mic prompt and welcome window. The
+            // Accessibility ask comes after the download, when it's needed.
+            refreshAccessibility()
             state.modelState = .needsDownload
             WelcomeWindow.shared.show(state: state, controller: self)
         }
@@ -131,6 +135,9 @@ final class DictationController {
                 state.modelState = .preparing("Optimizing for this Mac…")
                 try await transcriber.prepare()
                 state.modelState = .ready
+                // The deferred first-run Accessibility ask: model's ready, the
+                // welcome window says "Ready to go", one dialog at a time.
+                refreshAccessibility(prompt: true)
             } catch {
                 state.modelState = .failed(error.localizedDescription)
             }
@@ -156,6 +163,7 @@ final class DictationController {
             }
         }
         state.modelState = .ready
+        refreshAccessibility(prompt: true)
     }
 
     func refreshAccessibility(prompt: Bool = false) {
