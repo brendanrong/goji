@@ -70,8 +70,10 @@ final class DictationController {
         }
     }
 
-    /// Explicit path: user approved the one-time model download. Reports
-    /// progress into AppState so the welcome window and menu can show it.
+    /// Explicit path: user approved the one-time model download. Tries the
+    /// single-zip GitHub mirror first (fast CDN, real progress), falls back to
+    /// FluidAudio's HuggingFace crawl if the mirror is unavailable. Progress
+    /// goes into AppState so the welcome window and menu can show it.
     func downloadModels() {
         switch state.modelState {
         case .ready, .downloading, .preparing:
@@ -82,26 +84,46 @@ final class DictationController {
         state.modelState = .downloading(0, "Contacting server…")
         Task {
             do {
-                try await transcriber.prepare { progress in
-                    let label: String
-                    switch progress.phase {
-                    case .listing:
-                        label = "Contacting server…"
-                    case .downloading(let done, let total):
-                        label = "Downloading speech model (file \(min(done + 1, total)) of \(total))…"
-                    case .compiling:
-                        label = "Optimizing for this Mac…"
-                    }
-                    let fraction = progress.fractionCompleted
-                    Task { @MainActor [weak self] in
-                        self?.state.modelState = .downloading(fraction, label)
+                if !Transcriber.modelsAvailableLocally {
+                    do {
+                        try await ModelFetcher.fetch { fraction in
+                            Task { @MainActor [weak self] in
+                                self?.state.modelState = .downloading(fraction, "Downloading speech model…")
+                            }
+                        }
+                    } catch {
+                        try await prepareViaHuggingFace()
+                        return
                     }
                 }
+                state.modelState = .preparing("Optimizing for this Mac…")
+                try await transcriber.prepare()
                 state.modelState = .ready
             } catch {
                 state.modelState = .failed(error.localizedDescription)
             }
         }
+    }
+
+    /// FluidAudio's own downloader: sequential, file by file, slower, but it
+    /// works even if the GitHub model release is missing.
+    private func prepareViaHuggingFace() async throws {
+        try await transcriber.prepare { progress in
+            let label: String
+            switch progress.phase {
+            case .listing:
+                label = "Contacting server…"
+            case .downloading(let done, let total):
+                label = "Downloading speech model (file \(min(done + 1, total)) of \(total))…"
+            case .compiling:
+                label = "Optimizing for this Mac…"
+            }
+            let fraction = progress.fractionCompleted
+            Task { @MainActor [weak self] in
+                self?.state.modelState = .downloading(fraction, label)
+            }
+        }
+        state.modelState = .ready
     }
 
     func refreshAccessibility(prompt: Bool = false) {
