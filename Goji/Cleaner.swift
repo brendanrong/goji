@@ -76,11 +76,9 @@ actor FoundationCleaner {
         return baseInstructions + """
             \nThe speaker's vocabulary includes these exact names and terms: \
             \(vocabulary.joined(separator: ", ")). \
-            Only replace a transcript word with one of these terms when the word \
-            is unmistakably a failed attempt at it, nearly identical in sound. \
-            Ordinary English words stay exactly as they are, even if they sound \
-            vaguely similar. Never insert a vocabulary term that was not attempted. \
-            When in doubt, leave the word unchanged.
+            When a word in the transcript is a close mishearing of one of them, \
+            replace it with the exact listed spelling. Do not change words that \
+            are not close matches.
             """
     }
 
