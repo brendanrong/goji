@@ -38,7 +38,7 @@ Read PRD.md for scope. v1 is the core loop plus a lean settings window. Don't go
 - `Sounds.swift`: start/stop cues in three packs (Minimal/Wood bundled WAVs, Classic system sounds).
 - `SystemAudio.swift`: CoreAudio duck-to-20%/restore of the default output + outputIsActive() check (HDMI/DP monitors often expose no volume control, so ducking falls back to media pause).
 - `MediaKeys.swift`: synthetic play/pause media key (F8). Pauses/resumes whatever owns Now Playing while dictating; only sent when audio is flowing because it's a blind toggle.
-- `UpdateChecker.swift`: daily check of api.github.com's latest-release tag vs the running version (About toggle, on by default); "Update Available" surfaces in the menu bar + About, download opens releases/latest/download/Goji.dmg.
+- `UpdateChecker.swift`: daily check of api.github.com's latest-release tag vs the running version (About toggle, on by default); "Update to Goji X…" in the menu bar + About installs in-app (download DMG -> quiet mount -> stage -> swap /Applications/Goji.app -> strip quarantine -> relaunch). Falls back to the browser DMG when not running from /Applications or on any failure.
 - `Permissions.swift`: mic + Accessibility helpers.
 - `MenuContent.swift`: the status bar menu (paste last, settings, permissions, quit).
 

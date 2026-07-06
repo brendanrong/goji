@@ -479,16 +479,7 @@ struct AboutPane: View {
                 }
                 Divider()
                 SettingsRow("Updates", subtitle: updateStatus) {
-                    if updates.availableVersion != nil {
-                        Button("Download Update") {
-                            updates.openDownload()
-                        }
-                    } else {
-                        Button(updates.checking ? "Checking…" : "Check for Updates") {
-                            Task { await updates.check() }
-                        }
-                        .disabled(updates.checking)
-                    }
+                    updatesControl
                 }
                 Divider()
                 SettingsRow("Check automatically",
@@ -516,9 +507,47 @@ struct AboutPane: View {
         "Version " + UpdateChecker.currentVersion
     }
 
+    @ViewBuilder
+    private var updatesControl: some View {
+        switch updates.installPhase {
+        case .downloading(let fraction):
+            ProgressView(value: fraction)
+                .frame(width: 110)
+        case .installing:
+            ProgressView()
+                .controlSize(.small)
+        case .failed:
+            Button("Download in Browser") {
+                updates.openDownload()
+            }
+        case .idle:
+            if updates.availableVersion != nil {
+                Button("Install Update") {
+                    updates.installUpdate()
+                }
+            } else {
+                Button(updates.checking ? "Checking…" : "Check for Updates") {
+                    Task { await updates.check() }
+                }
+                .disabled(updates.checking)
+            }
+        }
+    }
+
     private var updateStatus: String {
+        switch updates.installPhase {
+        case .downloading:
+            return "Downloading Goji \(updates.availableVersion ?? "")…"
+        case .installing:
+            return "Installing… Goji will relaunch itself in a moment."
+        case .failed(let message):
+            return "Couldn't install automatically (\(message)) Grab it in the browser instead."
+        case .idle:
+            break
+        }
         if let available = updates.availableVersion {
-            return "Goji \(available) is ready to download. You're on \(UpdateChecker.currentVersion)."
+            let how = updates.canSelfInstall ? "One click installs and relaunches." : "Opens the download in your browser."
+            return "Goji \(available) is ready. You're on \(UpdateChecker.currentVersion). \(how)"
         }
         if updates.lastCheckFailed {
             return "Couldn't reach GitHub to check. Try again in a moment."
