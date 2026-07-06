@@ -65,32 +65,6 @@ final class DictationController {
             }
             .store(in: &cancellables)
 
-        // Names & phrases edits rebuild the boosting pipeline. Debounced:
-        // the list binding fires per keystroke and the rebuild isn't free.
-        settings.$vocabulary
-            .dropFirst()
-            .debounce(for: .seconds(1.5), scheduler: RunLoop.main)
-            .sink { [weak self] _ in
-                self?.pushVocabulary()
-            }
-            .store(in: &cancellables)
-
-        // Booster model downloads (or removals) also refresh the pipeline.
-        ModelLibrary.shared.$revision
-            .dropFirst()
-            .sink { [weak self] _ in
-                self?.pushVocabulary()
-            }
-            .store(in: &cancellables)
-
-        // The Enhanced recognition toggle turns the boost on and off live.
-        settings.$enhancedRecognition
-            .dropFirst()
-            .removeDuplicates()
-            .sink { [weak self] _ in
-                self?.pushVocabulary()
-            }
-            .store(in: &cancellables)
 
         if Transcriber.modelsAvailableLocally || Transcriber.availableLocally(settings.selectedModel) {
             // Returning user: mic is long granted, so this prompt (which only
@@ -104,13 +78,6 @@ final class DictationController {
             refreshAccessibility()
             state.modelState = .needsDownload
             WelcomeWindow.shared.show(state: state, controller: self)
-        }
-    }
-
-    private func pushVocabulary() {
-        let words = settings.enhancedRecognition ? settings.vocabulary : []
-        Task {
-            await transcriber.updateVocabulary(words)
         }
     }
 
@@ -133,7 +100,6 @@ final class DictationController {
         Task {
             do {
                 try await transcriber.prepare(model: settings.selectedModel)
-                await transcriber.updateVocabulary(settings.enhancedRecognition ? settings.vocabulary : [])
                 state.modelState = .ready
             } catch {
                 state.modelState = .failed(error.localizedDescription)

@@ -263,11 +263,6 @@ final class SettingsStore: ObservableObject {
     @Published var vocabulary: [VocabWord] {
         didSet { persistVocabulary() }
     }
-    /// Decoder-level boosting of Names & phrases (when the helper model is
-    /// installed). Off means the list only informs AI cleanup.
-    @Published var enhancedRecognition: Bool {
-        didSet { defaults.set(enhancedRecognition, forKey: Keys.enhancedRecognition) }
-    }
 
     /// Non-empty vocabulary entries, trimmed, ready for the cleanup prompt.
     var vocabularyTerms: [String] {
@@ -322,7 +317,6 @@ final class SettingsStore: ObservableObject {
         static let appearance = "appearance"
         static let replacements = "replacements"
         static let vocabulary = "vocabularyWords"
-        static let enhancedRecognition = "enhancedRecognition"
         static let showInMenuBar = "showInMenuBar"
         static let showInDock = "showInDock"
         static let micDeviceUID = "micDeviceUID"
@@ -381,7 +375,6 @@ final class SettingsStore: ObservableObject {
         } else {
             vocabulary = []
         }
-        enhancedRecognition = (d.object(forKey: Keys.enhancedRecognition) as? Bool) ?? true
     }
 
     /// The modifier bits the hotkey monitor must see held simultaneously.

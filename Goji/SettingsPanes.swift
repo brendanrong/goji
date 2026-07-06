@@ -222,7 +222,6 @@ struct MicrophoneSection: View {
 
 struct TranscriptionPane: View {
     @ObservedObject private var settings = SettingsStore.shared
-    @ObservedObject private var library = ModelLibrary.shared
 
     var body: some View {
         PaneScaffold(title: "Transcription", subtitle: "What happens to your words, in order") {
@@ -256,18 +255,8 @@ struct TranscriptionPane: View {
                         settings.vocabulary.append(VocabWord())
                     }
                 }
-                Divider()
-                SettingsRow("Enhanced recognition", subtitle: boosterSubtitle) {
-                    boosterControl
-                }
             }
-            CaptionText("Corrected acoustically inside the speech model, so 'Jaken' comes out 'Jachin'. Needs no Apple Intelligence, just the one-time download above.")
-
-            if let error = library.lastError {
-                Text(error)
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-            }
+            CaptionText("AI cleanup nudges close mishearings to these exact spellings ('Jaken' becomes 'Jachin'), including the ones Goji learns when you fix transcripts in History. Needs the cleanup toggle on.")
 
             SectionHeader("AI cleanup")
             SettingsCard {
@@ -320,37 +309,6 @@ struct TranscriptionPane: View {
         }
     }
 
-    private var boosterSubtitle: String {
-        if library.boosterProgress != nil {
-            return "Downloading the helper model…"
-        }
-        if Transcriber.boosterInstalled {
-            return settings.enhancedRecognition
-                ? "Boosting your words inside the speech model itself, before any cleanup. Works with the Parakeet models."
-                : "Downloaded but off. Your list only informs AI cleanup until you flip this back on."
-        }
-        return "A one-time helper model (~150 MB) teaches the recognizer to prefer your words. Works with the Parakeet models."
-    }
-
-    @ViewBuilder
-    private var boosterControl: some View {
-        if let progress = library.boosterProgress {
-            VStack(alignment: .trailing, spacing: 3) {
-                ProgressView(value: progress.fraction)
-                    .frame(width: 110)
-                Text("\(Int(progress.fraction * 100))%  \(progress.label)")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-        } else if Transcriber.boosterInstalled {
-            Toggle("Enhanced recognition", isOn: $settings.enhancedRecognition)
-                .labelsHidden()
-        } else {
-            Button("Download") {
-                library.downloadBooster()
-            }
-        }
-    }
 }
 
 struct ModelsPane: View {
