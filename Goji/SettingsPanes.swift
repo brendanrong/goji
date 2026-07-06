@@ -459,46 +459,68 @@ struct AboutPane: View {
     @ObservedObject private var updates = UpdateChecker.shared
 
     var body: some View {
-        PaneScaffold(title: "About", subtitle: "Local, private dictation") {
-            SettingsCard {
-                HStack(spacing: 12) {
+        PaneScaffold(title: "About", subtitle: "Version info and support") {
+            VStack(spacing: 18) {
+                VStack(spacing: 3) {
                     Image(nsImage: NSApp.applicationIconImage)
                         .resizable()
-                        .frame(width: 48, height: 48)
-                    VStack(alignment: .leading) {
-                        Text("Goji")
-                            .font(.title3.bold())
-                        Text(version)
-                            .foregroundStyle(.secondary)
+                        .frame(width: 96, height: 96)
+                        .padding(.bottom, 6)
+                    Text("Goji")
+                        .font(.title.bold())
+                    Text(version)
+                        .foregroundStyle(.secondary)
+                    Text("Local, private dictation for macOS")
+                        .foregroundStyle(.secondary)
+                }
+
+                Text("Hold a key, talk, release, and your words paste where your cursor is. Speech is transcribed entirely on this Mac.")
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: 420)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                VStack(alignment: .leading, spacing: 7) {
+                    HStack(spacing: 7) {
+                        Image(systemName: "checkmark.seal.fill")
+                            .foregroundStyle(.green)
+                        Text("Signed and notarized by Apple")
+                    }
+                    HStack(spacing: 7) {
+                        Image(systemName: "lock.fill")
+                            .foregroundStyle(Color.accentColor)
+                        Text("No cloud, no account, no telemetry. Free forever.")
                     }
                 }
-                .padding(.vertical, 12)
-                .onAppear {
-                    // Re-check whenever About opens, not just at launch.
-                    Task { await updates.check() }
-                }
-                Divider()
-                SettingsRow("Updates", subtitle: updateStatus) {
-                    updatesControl
-                }
-                Divider()
-                SettingsRow("Check automatically",
-                            subtitle: "Asks GitHub once a day whether a newer version exists. Nothing else is sent.") {
-                    Toggle("Check automatically", isOn: $settings.autoCheckUpdates)
-                        .labelsHidden()
-                }
-                Divider()
-                SettingsRow("Private by design",
-                            subtitle: "Audio, transcripts, and settings never leave this Mac. No account, no telemetry, free forever.") {
-                    EmptyView()
-                }
-                Divider()
-                SettingsRow("Something broken?",
-                            subtitle: "Open an issue on GitHub and I'll take a look.") {
-                    Button("Report a Problem") {
-                        NSWorkspace.shared.open(URL(string: "https://github.com/brendanrong/goji/issues")!)
+                .font(.callout)
+
+                Text("Built by Brendan Rong.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+
+                VStack(spacing: 10) {
+                    HStack(spacing: 10) {
+                        updatesControl
+                        Button {
+                            NSWorkspace.shared.open(URL(string: "https://github.com/brendanrong/goji/issues")!)
+                        } label: {
+                            Label("Report a Problem", systemImage: "envelope")
+                        }
                     }
+                    Text(updateStatus)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    Toggle("Check for updates automatically", isOn: $settings.autoCheckUpdates)
+                        .toggleStyle(.checkbox)
+                        .font(.caption)
                 }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, 10)
+            .onAppear {
+                // Re-check whenever About opens, not just at launch.
+                Task { await updates.check() }
             }
         }
     }
@@ -521,13 +543,17 @@ struct AboutPane: View {
                 updates.openDownload()
             }
         case .idle:
-            if updates.availableVersion != nil {
-                Button("Install Update") {
+            if let available = updates.availableVersion {
+                Button {
                     updates.installUpdate()
+                } label: {
+                    Label("Install Goji \(available)", systemImage: "arrow.down.circle")
                 }
             } else {
-                Button(updates.checking ? "Checking…" : "Check for Updates") {
+                Button {
                     Task { await updates.check() }
+                } label: {
+                    Label(updates.checking ? "Checking…" : "Check for Updates", systemImage: "arrow.triangle.2.circlepath")
                 }
                 .disabled(updates.checking)
             }
