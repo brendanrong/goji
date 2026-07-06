@@ -16,19 +16,20 @@ actor Transcriber {
     private var spotter: CtcKeywordSpotter?
     private var rescorer: VocabularyRescorer?
     private var vocabContext: CustomVocabularyContext?
-    private var loadedVocabTerms: [String] = []
+    private var loadedVocabWords: [VocabWord] = []
 
     /// True when the CTC helper model for Names & phrases boosting is cached.
     nonisolated static var boosterInstalled: Bool {
         CtcModels.modelsExist(at: CtcModels.defaultCacheDirectory(for: .ctc110m))
     }
 
-    /// Rebuilds the boosting pipeline for the given terms. Cheap no-op when
+    /// Rebuilds the boosting pipeline for the given words. Cheap no-op when
     /// nothing changed; silently degrades to plain transcription on failure.
-    func updateVocabulary(_ terms: [String]) async {
-        let wantsBoost = !terms.isEmpty && Self.boosterInstalled
-        guard terms != loadedVocabTerms || (wantsBoost && rescorer == nil) else { return }
-        loadedVocabTerms = terms
+    func updateVocabulary(_ words: [VocabWord]) async {
+        let usable = words.filter { !$0.text.trimmingCharacters(in: .whitespaces).isEmpty }
+        let wantsBoost = !usable.isEmpty && Self.boosterInstalled
+        guard usable != loadedVocabWords || (wantsBoost && rescorer == nil) else { return }
+        loadedVocabWords = usable
         vocabContext = nil
         spotter = nil
         rescorer = nil
@@ -46,10 +47,18 @@ actor Transcriber {
             }
 
             let tokenizer = try await CtcTokenizer.load(from: cacheDir)
-            let tokenized = terms.compactMap { text -> CustomVocabularyTerm? in
+            let tokenized = usable.compactMap { word -> CustomVocabularyTerm? in
+                let text = word.text.trimmingCharacters(in: .whitespaces)
                 let ids = tokenizer.encode(text)
                 guard !ids.isEmpty else { return nil }
-                return CustomVocabularyTerm(text: text, weight: nil, aliases: nil, tokenIds: nil, ctcTokenIds: ids)
+                let aliases = (word.aliases ?? []).filter { !$0.isEmpty }
+                return CustomVocabularyTerm(
+                    text: text,
+                    weight: nil,
+                    aliases: aliases.isEmpty ? nil : aliases,
+                    tokenIds: nil,
+                    ctcTokenIds: ids
+                )
             }
             guard !tokenized.isEmpty else { return }
 

@@ -32,7 +32,8 @@ Read PRD.md for scope. v1 is the core loop plus a lean settings window. Don't go
 - `SettingsControls.swift`: card/row/scaffold building blocks the panes are made of.
 - `SettingsWindow.swift`: managed NSWindow that hosts SettingsView. Exists because SwiftUI's Settings scene is broken for menu bar apps on macOS 26.
 - `WelcomeWindow.swift` / `WelcomeView.swift`: first-run window. Fresh installs (no bundled or cached model) must explicitly approve the one-time ~600 MB model download; shows live progress via AppState.ModelState.downloading.
-- `HistoryStore.swift`: recent transcripts, capped at 50, local UserDefaults only.
+- `HistoryStore.swift`: recent transcripts, capped at 50, local UserDefaults only. Rows are editable in the History pane ("fix and learn").
+- `CorrectionLearner.swift`: word-level LCS diff between a transcript and the user's fix; changed pairs feed SettingsStore.learn (right spelling into Names & phrases, mishearing stored as its alias, aliases flow into boosting and the cleanup prompt).
 - `MicDevices.swift`: CoreAudio input-device listing + UID resolution for the mic picker.
 - `Cleaner.swift`: optional on-device AI cleanup (Apple Foundation Models, macOS 26+). Takes the user's Names & phrases vocabulary and nudges close mishearings to exact spellings. Returns raw text on any failure.
 - `Sounds.swift`: start/stop cues in three packs (Minimal/Wood bundled WAVs, Classic system sounds).

@@ -229,16 +229,23 @@ struct TranscriptionPane: View {
             SectionHeader("Names & phrases")
             SettingsCard {
                 ForEach($settings.vocabulary) { $word in
-                    HStack {
-                        TextField("Name, team, or term", text: $word.text)
-                            .textFieldStyle(.roundedBorder)
-                        Button {
-                            settings.vocabulary.removeAll { $0.id == word.id }
-                        } label: {
-                            Image(systemName: "minus.circle.fill")
-                                .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack {
+                            TextField("Name, team, or term", text: $word.text)
+                                .textFieldStyle(.roundedBorder)
+                            Button {
+                                settings.vocabulary.removeAll { $0.id == word.id }
+                            } label: {
+                                Image(systemName: "minus.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.borderless)
                         }
-                        .buttonStyle(.borderless)
+                        if let aliases = word.aliases, !aliases.isEmpty {
+                            Text("learned mishearings: \(aliases.joined(separator: ", "))")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
                     }
                     .padding(.vertical, 6)
                     Divider()
@@ -470,6 +477,10 @@ struct TagBadge: View {
 
 struct HistoryPane: View {
     @ObservedObject private var history = HistoryStore.shared
+    @ObservedObject private var settings = SettingsStore.shared
+    @State private var editingID: UUID?
+    @State private var draft = ""
+    @State private var learnedNote: String?
 
     var body: some View {
         PaneScaffold(title: "History", subtitle: "Recent transcripts, stored only on this Mac") {
@@ -482,20 +493,7 @@ struct HistoryPane: View {
             } else {
                 SettingsCard {
                     ForEach(history.items.prefix(8)) { item in
-                        HStack(alignment: .top) {
-                            Text(item.text)
-                                .lineLimit(2)
-                            Spacer()
-                            Button {
-                                NSPasteboard.general.clearContents()
-                                NSPasteboard.general.setString(item.text, forType: .string)
-                            } label: {
-                                Image(systemName: "doc.on.doc")
-                            }
-                            .buttonStyle(.borderless)
-                            .help("Copy")
-                        }
-                        .padding(.vertical, 8)
+                        row(for: item)
                         Divider()
                     }
                     SettingsRow("Remove all transcripts") {
@@ -504,8 +502,69 @@ struct HistoryPane: View {
                         }
                     }
                 }
+                if let learnedNote {
+                    Text(learnedNote)
+                        .font(.caption)
+                        .foregroundStyle(Color.accentColor)
+                }
+                CaptionText("Fix a transcript with the pencil and Goji learns: the corrected word joins Names & phrases, and the mishearing is remembered as one of its spellings.")
             }
         }
+    }
+
+    @ViewBuilder
+    private func row(for item: HistoryItem) -> some View {
+        if editingID == item.id {
+            VStack(alignment: .leading, spacing: 8) {
+                TextField("Transcript", text: $draft, axis: .vertical)
+                    .textFieldStyle(.roundedBorder)
+                    .lineLimit(1...4)
+                HStack(spacing: 8) {
+                    Button("Save & Learn") {
+                        save(item)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    Button("Cancel") {
+                        editingID = nil
+                    }
+                }
+            }
+            .padding(.vertical, 8)
+        } else {
+            HStack(alignment: .top) {
+                Text(item.text)
+                    .lineLimit(2)
+                Spacer()
+                Button {
+                    draft = item.text
+                    learnedNote = nil
+                    editingID = item.id
+                } label: {
+                    Image(systemName: "pencil")
+                }
+                .buttonStyle(.borderless)
+                .help("Fix this transcript; Goji learns the correction")
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(item.text, forType: .string)
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                }
+                .buttonStyle(.borderless)
+                .help("Copy")
+            }
+            .padding(.vertical, 8)
+        }
+    }
+
+    private func save(_ item: HistoryItem) {
+        let corrections = CorrectionLearner.corrections(from: item.text, to: draft)
+        settings.learn(corrections)
+        history.update(item.id, text: draft)
+        editingID = nil
+        learnedNote = corrections.isEmpty
+            ? "Saved. No word changes to learn."
+            : "Learned: " + corrections.map { "\($0.wrong) → \($0.right)" }.joined(separator: ",  ")
     }
 }
 
