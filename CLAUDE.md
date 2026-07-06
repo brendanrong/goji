@@ -16,7 +16,8 @@ Read PRD.md for scope. v1 is the core loop plus a lean settings window. Don't go
 - `GojiApp.swift`: @main, MenuBarExtra scene, app delegate.
 - `AppState.swift`: observable state (model status, phase, permissions).
 - `DictationController.swift`: the brain. Wires hotkey -> recorder -> transcriber -> inserter.
-- `HotkeyMonitor.swift`: global NSEvent monitors. Emits raw down/up for the configured modifier key (read live from SettingsStore).
+- `HotkeyMonitor.swift`: global NSEvent monitors. Emits raw down/up for the configured shortcut, a preset modifier key or a recorded modifier combo (read live from SettingsStore).
+- `HotkeyRecorder.swift`: the Custom Combo recorder row in Settings (capture any mix of held modifiers, left/right specific) + the ModifierBits table.
 - `EscapeInterceptor.swift`: CGEventTap that swallows Esc, armed only while recording, so cancelling a dictation doesn't leak Esc into the frontmost app.
 - `AudioRecorder.swift`: AVAudioEngine tap, converts to 16 kHz mono Float32.
 - `Transcriber.swift`: FluidAudio AsrManager wrapper (actor).
