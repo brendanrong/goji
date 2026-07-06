@@ -17,8 +17,15 @@ struct MenuContent: View {
             }
 
             if let available = updates.availableVersion {
-                Button("Update Available: Goji \(available)…") {
-                    updates.openDownload()
+                switch updates.installPhase {
+                case .downloading:
+                    Text("Downloading Goji \(available)…")
+                case .installing:
+                    Text("Installing Goji \(available)…")
+                case .idle, .failed:
+                    Button("Update to Goji \(available)…") {
+                        updates.installUpdate()
+                    }
                 }
             }
 
