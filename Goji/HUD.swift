@@ -39,6 +39,13 @@ final class HUDController {
         let placement = placement(for: style)
         if panel == nil || placement != currentPlacement {
             rebuild(for: placement)
+        } else if let panel {
+            // Same placement kind, but possibly a different screen: the user
+            // may have moved to another monitor since the last dictation.
+            // Without this, the panel keeps stale coordinates, which on
+            // stacked arrangements shows up at the neighboring screen's
+            // bottom edge.
+            position(panel, placement: placement)
         }
         panel?.orderFrontRegardless()
         model.visible = true
