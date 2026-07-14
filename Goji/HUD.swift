@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import SwiftUI
 
 /// Floating recording indicator. Two styles: a capsule panel at the bottom of the
@@ -36,16 +37,14 @@ final class HUDController {
             model.frontAppIcon = NSWorkspace.shared.frontmostApplication?.icon
         }
         model.mode = mode
-        let placement = placement(for: style)
+        guard let screen = targetScreen else { return }
+        let placement = placement(for: style, on: screen)
         if panel == nil || placement != currentPlacement {
-            rebuild(for: placement)
+            rebuild(for: placement, on: screen)
         } else if let panel {
             // Same placement kind, but possibly a different screen: the user
             // may have moved to another monitor since the last dictation.
-            // Without this, the panel keeps stale coordinates, which on
-            // stacked arrangements shows up at the neighboring screen's
-            // bottom edge.
-            position(panel, placement: placement)
+            position(panel, placement: placement, on: screen)
         }
         panel?.orderFrontRegardless()
         model.visible = true
@@ -64,19 +63,64 @@ final class HUDController {
         model.level = model.level * 0.55 + level * 0.45
     }
 
-    private func placement(for style: HUDStyle) -> Placement {
+    /// The screen dictation is landing on. NSScreen.main is useless for a
+    /// background app that never activates (it degrades to the primary
+    /// display), so ask where the focused text field actually is via
+    /// Accessibility, then fall back to the mouse's screen, then main.
+    private var targetScreen: NSScreen? {
+        if let point = Self.focusedElementPoint(),
+           let screen = NSScreen.screens.first(where: { NSMouseInRect(point, $0.frame, false) }) {
+            return screen
+        }
+        let mouse = NSEvent.mouseLocation
+        if let screen = NSScreen.screens.first(where: { NSMouseInRect(mouse, $0.frame, false) }) {
+            return screen
+        }
+        return NSScreen.main ?? NSScreen.screens.first
+    }
+
+    /// AppKit-space position of the system-wide focused UI element, if any.
+    private static func focusedElementPoint() -> NSPoint? {
+        var focusedRef: CFTypeRef?
+        let systemWide = AXUIElementCreateSystemWide()
+        guard
+            AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
+            let focused = focusedRef
+        else {
+            return nil
+        }
+        let element = focused as! AXUIElement
+        var posRef: CFTypeRef?
+        guard
+            AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &posRef) == .success,
+            let posValue = posRef,
+            CFGetTypeID(posValue) == AXValueGetTypeID()
+        else {
+            return nil
+        }
+        var cgPoint = CGPoint.zero
+        guard AXValueGetValue(posValue as! AXValue, .cgPoint, &cgPoint) else {
+            return nil
+        }
+        // AX coordinates are top-left origin; AppKit is bottom-left.
+        // Flip against the primary screen.
+        guard let primary = NSScreen.screens.first else { return nil }
+        return NSPoint(x: cgPoint.x, y: primary.frame.maxY - cgPoint.y)
+    }
+
+    private func placement(for style: HUDStyle, on screen: NSScreen) -> Placement {
         switch style {
         case .panel:
             return .bottomPanel
         case .notch:
-            if let notch = NSScreen.main?.notchArea {
+            if let notch = screen.notchArea {
                 return .notch(notch)
             }
             return .syntheticNotch
         }
     }
 
-    private func rebuild(for placement: Placement) {
+    private func rebuild(for placement: Placement, on screen: NSScreen) {
         panel?.orderOut(nil)
         panel = nil
 
@@ -100,7 +144,7 @@ final class HUDController {
             newPanel.contentView = NSHostingView(rootView: NotchHUDView(model: model, notchWidth: fake.width))
         }
 
-        position(newPanel, placement: placement)
+        position(newPanel, placement: placement, on: screen)
         panel = newPanel
         currentPlacement = placement
     }
@@ -120,8 +164,7 @@ final class HUDController {
         return panel
     }
 
-    private func position(_ panel: NSPanel, placement: Placement) {
-        guard let screen = NSScreen.main else { return }
+    private func position(_ panel: NSPanel, placement: Placement, on screen: NSScreen) {
         let size = panel.frame.size
         switch placement {
         case .bottomPanel:
