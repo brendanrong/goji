@@ -32,6 +32,7 @@ final class DictationController {
 
     /// True when we sent play/pause at recording start, so we resume after.
     private var pausedMedia = false
+    private var recordingStartedAt: Date?
     private var cancellables = Set<AnyCancellable>()
 
     init(state: AppState) {
@@ -274,6 +275,7 @@ final class DictationController {
                     pausedMedia = true
                 }
             }
+            recordingStartedAt = Date()
             state.phase = .recording
             escape.arm()
             hud.show(.listening, style: settings.hudStyle)
@@ -290,10 +292,17 @@ final class DictationController {
         resetLockState()
         escape.disarm()
         let samples = recorder.stop()
+        let held = recordingStartedAt.map { Date().timeIntervalSince($0) } ?? 0
+        recordingStartedAt = nil
         SystemAudio.restoreOutput()
         resumeMediaIfPaused()
 
         guard samples.count >= minimumSamples else {
+            // Held long enough to speak but the mic never produced a buffer:
+            // the audio device is dead, don't fail silently.
+            if held >= 0.5, recorder.deliveredNoAudio {
+                state.lastError = "Mic delivered no audio. Try a different microphone in Settings, or reconnect Bluetooth headphones."
+            }
             state.phase = .idle
             hud.hide()
             return
@@ -343,6 +352,7 @@ final class DictationController {
         resetLockState()
         escape.disarm()
         _ = recorder.stop()
+        recordingStartedAt = nil
         SystemAudio.restoreOutput()
         resumeMediaIfPaused()
         state.phase = .idle

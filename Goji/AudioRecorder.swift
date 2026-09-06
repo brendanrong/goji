@@ -1,75 +1,89 @@
 import AVFoundation
-import CoreAudio
 
 /// Captures microphone audio and accumulates 16 kHz mono Float32 samples,
 /// the format Parakeet expects. Start on key press, stop on release.
-final class AudioRecorder {
+///
+/// Built on AVCaptureSession bound to a specific device, NOT AVAudioEngine.
+/// AVAudioEngine.inputNode always wraps the *system default* input in its own
+/// aggregate device the moment it's created, before any device override can
+/// take effect. With Bluetooth headphones as the default that wakes the HFP
+/// mic on every dictation; once the Bluetooth audio stack wedges, the HAL IO
+/// thread never starts and every recording (any mic) delivers zero buffers
+/// until a reboot. AVCaptureSession talks to the chosen device directly and
+/// never touches the default input. Verified with scripts/mic-probe*.swift.
+final class AudioRecorder: NSObject, AVCaptureAudioDataOutputSampleBufferDelegate {
     static let sampleRate: Double = 16_000
 
     /// Mic level callback (0...1), delivered on the main queue while recording.
     var onLevel: ((Float) -> Void)?
 
-    private var engine: AVAudioEngine?
+    private var session: AVCaptureSession?
+    private let queue = DispatchQueue(label: "goji.audio.capture")
     private let lock = NSLock()
     private var samples: [Float] = []
-    private var converter: AVAudioConverter?
+    private var buffersReceived = 0
+
+    /// True when the mic was opened but never delivered a single buffer.
+    /// That's the "audio system is wedged" signature; surface it to the user.
+    var deliveredNoAudio: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return buffersReceived == 0
+    }
 
     func start(deviceUID: String? = nil) throws {
-        // Fresh engine every recording. A long-lived AVAudioEngine goes stale
-        // across sleep/wake and input-device changes; rebuilding it each time is
-        // the simplest way to survive both without an app restart.
         teardown()
 
         lock.lock()
         samples.removeAll()
+        buffersReceived = 0
         lock.unlock()
 
-        let engine = AVAudioEngine()
-        self.engine = engine
-        let input = engine.inputNode
-
-        // Route to the chosen mic; silently fall back to the system default.
-        if let deviceUID,
-           let deviceID = MicDevices.deviceID(forUID: deviceUID),
-           let unit = input.audioUnit {
-            var device = deviceID
-            AudioUnitSetProperty(
-                unit,
-                kAudioOutputUnitProperty_CurrentDevice,
-                kAudioUnitScope_Global,
-                0,
-                &device,
-                UInt32(MemoryLayout<AudioDeviceID>.size)
-            )
+        let device: AVCaptureDevice?
+        if let deviceUID, let chosen = AVCaptureDevice(uniqueID: deviceUID) {
+            device = chosen
+        } else {
+            // Unset or unplugged: fall back to whatever the system default is.
+            device = AVCaptureDevice.default(for: .audio)
         }
-
-        let inputFormat = input.outputFormat(forBus: 0)
-
-        guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0 else {
-            teardown()
+        guard let device else {
             throw GojiError("No microphone input available. Check mic permission in System Settings > Privacy & Security > Microphone.")
         }
-        guard let outputFormat = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32,
-            sampleRate: Self.sampleRate,
-            channels: 1,
-            interleaved: false
-        ) else {
-            teardown()
-            throw GojiError("Could not create 16 kHz audio format.")
-        }
 
-        converter = AVAudioConverter(from: inputFormat, to: outputFormat)
-
-        input.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
-            self?.append(buffer, outputFormat: outputFormat)
-        }
-        engine.prepare()
+        let session = AVCaptureSession()
+        let input: AVCaptureDeviceInput
         do {
-            try engine.start()
+            input = try AVCaptureDeviceInput(device: device)
         } catch {
+            throw GojiError("Couldn't open \(device.localizedName): \(error.localizedDescription)")
+        }
+        guard session.canAddInput(input) else {
+            throw GojiError("Couldn't open \(device.localizedName).")
+        }
+        session.addInput(input)
+
+        // Ask capture for Parakeet's format directly; no manual converter.
+        let output = AVCaptureAudioDataOutput()
+        output.audioSettings = [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVSampleRateKey: Self.sampleRate,
+            AVNumberOfChannelsKey: 1,
+            AVLinearPCMBitDepthKey: 32,
+            AVLinearPCMIsFloatKey: true,
+            AVLinearPCMIsNonInterleaved: false,
+            AVLinearPCMIsBigEndianKey: false,
+        ]
+        output.setSampleBufferDelegate(self, queue: queue)
+        guard session.canAddOutput(output) else {
+            throw GojiError("Couldn't read from \(device.localizedName).")
+        }
+        session.addOutput(output)
+
+        self.session = session
+        session.startRunning()
+        guard session.isRunning else {
             teardown()
-            throw error
+            throw GojiError("\(device.localizedName) didn't start.")
         }
     }
 
@@ -80,42 +94,34 @@ final class AudioRecorder {
         return samples
     }
 
-    /// Stops the tap and releases the engine. Idempotent.
+    /// Stops capture and releases the session. Idempotent.
     private func teardown() {
-        if let engine {
-            engine.inputNode.removeTap(onBus: 0)
-            engine.stop()
+        if let session, session.isRunning {
+            session.stopRunning()
         }
-        engine = nil
-        converter = nil
+        session = nil
     }
 
-    private func append(_ buffer: AVAudioPCMBuffer, outputFormat: AVAudioFormat) {
-        guard let converter else { return }
+    func captureOutput(
+        _ output: AVCaptureOutput,
+        didOutput sampleBuffer: CMSampleBuffer,
+        from connection: AVCaptureConnection
+    ) {
+        let frames = CMSampleBufferGetNumSamples(sampleBuffer)
+        guard frames > 0,
+              let description = CMSampleBufferGetFormatDescription(sampleBuffer),
+              let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(description),
+              let format = AVAudioFormat(streamDescription: asbd),
+              let pcm = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frames)) else { return }
+        pcm.frameLength = AVAudioFrameCount(frames)
+        guard CMSampleBufferCopyPCMDataIntoAudioBufferList(
+            sampleBuffer, at: 0, frameCount: Int32(frames), into: pcm.mutableAudioBufferList
+        ) == noErr, let channel = pcm.floatChannelData?.pointee else { return }
 
-        let ratio = Self.sampleRate / buffer.format.sampleRate
-        let capacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 16
-        guard let converted = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: capacity) else { return }
-
-        var consumed = false
-        var error: NSError?
-        converter.convert(to: converted, error: &error) { _, status in
-            if consumed {
-                status.pointee = .noDataNow
-                return nil
-            }
-            consumed = true
-            status.pointee = .haveData
-            return buffer
-        }
-
-        guard error == nil,
-              converted.frameLength > 0,
-              let channel = converted.floatChannelData?.pointee else { return }
-
-        let chunk = Array(UnsafeBufferPointer(start: channel, count: Int(converted.frameLength)))
+        let chunk = Array(UnsafeBufferPointer(start: channel, count: frames))
         lock.lock()
         samples.append(contentsOf: chunk)
+        buffersReceived += 1
         lock.unlock()
 
         // Level meter for the HUD waveform.
