@@ -376,6 +376,10 @@ final class DictationController {
                     return
                 }
 
+                // Deterministic pass first: spoken commands, fillers, stutters.
+                // Resolving "scratch that" and "new paragraph" here means the
+                // AI pass (if on) only polishes and can't drop or merge them.
+                cleaned = TranscriptFormatter.format(cleaned, options: settings.formatterOptions)
                 if settings.cleanupEnabled {
                     let cleanupStart = Date()
                     cleaned = await Cleaner.cleanup(cleaned, vocabulary: settings.vocabularyTerms)

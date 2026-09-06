@@ -235,6 +235,23 @@ final class SettingsStore: ObservableObject {
     @Published var removeTrailingFullStop: Bool {
         didSet { defaults.set(removeTrailingFullStop, forKey: Keys.removeTrailingFullStop) }
     }
+    /// Deterministic cleanup (TranscriptFormatter), no model needed.
+    @Published var spokenCommands: Bool {
+        didSet { defaults.set(spokenCommands, forKey: Keys.spokenCommands) }
+    }
+    @Published var removeFillers: Bool {
+        didSet { defaults.set(removeFillers, forKey: Keys.removeFillers) }
+    }
+    @Published var collapseStutters: Bool {
+        didSet { defaults.set(collapseStutters, forKey: Keys.collapseStutters) }
+    }
+    var formatterOptions: TranscriptFormatter.Options {
+        TranscriptFormatter.Options(
+            spokenCommands: spokenCommands,
+            removeFillers: removeFillers,
+            collapseStutters: collapseStutters
+        )
+    }
     /// Ask GitHub once a day whether a newer release exists.
     @Published var autoCheckUpdates: Bool {
         didSet {
@@ -293,6 +310,9 @@ final class SettingsStore: ObservableObject {
         static let legacyMuteWhileDictating = "muteWhileDictating"
         static let cleanupEnabled = "cleanupEnabled"
         static let removeTrailingFullStop = "removeTrailingFullStop"
+        static let spokenCommands = "spokenCommands"
+        static let removeFillers = "removeFillers"
+        static let collapseStutters = "collapseStutters"
         static let autoCheckUpdates = "autoCheckUpdates"
     }
 
@@ -326,6 +346,9 @@ final class SettingsStore: ObservableObject {
         selectedModel = SpeechModel(rawValue: d.string(forKey: Keys.selectedModel) ?? "") ?? .standard
         cleanupEnabled = d.bool(forKey: Keys.cleanupEnabled)
         removeTrailingFullStop = d.bool(forKey: Keys.removeTrailingFullStop)
+        spokenCommands = (d.object(forKey: Keys.spokenCommands) as? Bool) ?? true
+        removeFillers = (d.object(forKey: Keys.removeFillers) as? Bool) ?? true
+        collapseStutters = (d.object(forKey: Keys.collapseStutters) as? Bool) ?? true
         autoCheckUpdates = (d.object(forKey: Keys.autoCheckUpdates) as? Bool) ?? true
         if let data = d.data(forKey: Keys.replacements),
            let rules = try? JSONDecoder().decode([ReplacementRule].self, from: data) {

@@ -267,16 +267,35 @@ struct TranscriptionPane: View {
                 }
             }
             CaptionText(Cleaner.unavailabilityHint
-                ?? "Removes filler words, applies self-corrections like 'scratch that', and turns 'new line' into a real line break. The only option on this pane that needs Apple Intelligence.")
+                ?? "Polishes punctuation and nudges mishearings toward your Names & phrases. Adds about a second per dictation. Commands, fillers, and stutters are handled below without it.")
 
             SectionHeader("Formatting")
             SettingsCard {
+                SettingsRow("Spoken commands",
+                            subtitle: "Say \"new line\", \"new paragraph\", or \"scratch that\" to drop what you just said.") {
+                    Toggle("Spoken commands", isOn: $settings.spokenCommands)
+                        .labelsHidden()
+                }
+                Divider()
+                SettingsRow("Remove filler words",
+                            subtitle: "Drops um, uh, erm, and a \"you know\" or \"like\" used as filler.") {
+                    Toggle("Remove filler words", isOn: $settings.removeFillers)
+                        .labelsHidden()
+                }
+                Divider()
+                SettingsRow("Fix stutters",
+                            subtitle: "\"The the plan\" becomes \"the plan\". Intentional doubles like \"very very\" stay.") {
+                    Toggle("Fix stutters", isOn: $settings.collapseStutters)
+                        .labelsHidden()
+                }
+                Divider()
                 SettingsRow("Remove the full stop at the end",
                             subtitle: "Drops the final period the model adds to every dictation. Question marks and exclamations stay.") {
                     Toggle("Remove the full stop at the end", isOn: $settings.removeTrailingFullStop)
                         .labelsHidden()
                 }
             }
+            CaptionText("These run on every Mac, no Apple Intelligence needed, and take no time at all.")
 
             SectionHeader("Word replacements")
             SettingsCard {
