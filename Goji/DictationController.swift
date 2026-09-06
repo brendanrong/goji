@@ -17,6 +17,8 @@ final class DictationController {
 
     /// Recordings shorter than this are treated as accidental taps and dropped.
     private let minimumSamples = Int(0.3 * AudioRecorder.sampleRate)
+    /// Audio kept after key-up so a clipped last syllable still lands.
+    private let tailPadding: TimeInterval = 0.2
 
     // Double-tap lock (hold mode): a quick tap-tap locks recording hands-free,
     // the next tap finishes it. State below tracks the tap timing.
@@ -51,6 +53,17 @@ final class DictationController {
         recorder.onLevel = { [weak self] level in
             self?.hud.updateLevel(level)
         }
+        // Pre-build the capture session so the first key-down is fast, and
+        // rebuild whenever the mic setting changes.
+        recorder.prepare(deviceUID: settings.micDeviceUID)
+        settings.$micDeviceUID
+            .dropFirst()
+            .removeDuplicates()
+            .sink { [weak self] uid in
+                guard let self, self.state.phase == .idle else { return }
+                self.recorder.prepare(deviceUID: uid)
+            }
+            .store(in: &cancellables)
 
         // If the chosen model's files were removed outside the app, fall back.
         if !Transcriber.availableLocally(settings.selectedModel), settings.selectedModel != .standard {
@@ -305,11 +318,24 @@ final class DictationController {
         guard state.phase == .recording else { return }
         resetLockState()
         escape.disarm()
+        // People release the key on the last syllable ("three" came out as
+        // "through" in testing). Keep capturing briefly, then finish. Phase
+        // flips now so a re-press or Esc during the tail is ignored.
+        state.phase = .transcribing
+        hud.show(.transcribing, style: settings.hudStyle)
+        DispatchQueue.main.asyncAfter(deadline: .now() + tailPadding) { [weak self] in
+            self?.completeRecording()
+        }
+    }
+
+    private func completeRecording() {
         let samples = recorder.stop()
-        let held = recordingStartedAt.map { Date().timeIntervalSince($0) } ?? 0
+        let held = recordingStartedAt.map { Date().timeIntervalSince($0) - tailPadding } ?? 0
         recordingStartedAt = nil
         SystemAudio.restoreOutput()
         resumeMediaIfPaused()
+        // Rebuild the idle session now so the next key-down only has to start it.
+        recorder.prepare(deviceUID: settings.micDeviceUID)
 
         let audioSeconds = Double(samples.count) / AudioRecorder.sampleRate
         Log.dictation.notice("recording stopped: held \(Int(held * 1000)) ms, audio \(String(format: "%.2f", audioSeconds), privacy: .public) s")
@@ -327,8 +353,6 @@ final class DictationController {
             return
         }
 
-        state.phase = .transcribing
-        hud.show(.transcribing, style: settings.hudStyle)
         if settings.playSounds {
             Sounds.recordingStopped()
         }
@@ -393,6 +417,7 @@ final class DictationController {
         escape.disarm()
         _ = recorder.stop()
         recordingStartedAt = nil
+        recorder.prepare(deviceUID: settings.micDeviceUID)
         Log.dictation.notice("recording cancelled (Esc)")
         SystemAudio.restoreOutput()
         resumeMediaIfPaused()

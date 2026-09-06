@@ -23,6 +23,8 @@ final class AudioRecorder: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
     private var samples: [Float] = []
     private var buffersReceived = 0
     private var startedAt = Date()
+    /// The device the idle, pre-built session is bound to.
+    private var preparedDeviceID: String?
     /// Name of the mic the last recording actually used (after any fallback).
     private(set) var deviceName = "microphone"
 
@@ -34,31 +36,83 @@ final class AudioRecorder: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
         return buffersReceived == 0
     }
 
-    func start(deviceUID: String? = nil) throws {
+    /// Build (but don't start) a session for the chosen mic so key-down only
+    /// has to call startRunning. Called after every stop and when the mic
+    /// setting changes; cheap to call again with the same device.
+    func prepare(deviceUID: String?) {
+        if let session, !session.isRunning, preparedFor(deviceUID) {
+            return
+        }
         teardown()
+        do {
+            let (session, device) = try buildSession(deviceUID: deviceUID)
+            self.session = session
+            preparedDeviceID = device.uniqueID
+            deviceName = device.localizedName
+        } catch {
+            Log.audio.error("prepare failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
 
+    func start(deviceUID: String? = nil) throws {
         lock.lock()
         samples.removeAll()
         buffersReceived = 0
         lock.unlock()
+        startedAt = Date()
 
-        let device: AVCaptureDevice?
-        if let deviceUID, let chosen = AVCaptureDevice(uniqueID: deviceUID) {
-            device = chosen
-        } else {
-            // Unset or unplugged: fall back to whatever the system default is.
-            device = AVCaptureDevice.default(for: .audio)
+        // Reuse the pre-built session when it's for this mic and that mic is
+        // still around; otherwise build one now (slower, still correct).
+        if session == nil || session?.isRunning == true || !preparedFor(deviceUID) {
+            teardown()
+            let (session, device) = try buildSession(deviceUID: deviceUID)
+            self.session = session
+            preparedDeviceID = device.uniqueID
+            deviceName = device.localizedName
+            Log.audio.notice("built session on demand for \(device.localizedName, privacy: .public) in \(Log.ms(since: self.startedAt)) ms")
         }
-        guard let device else {
+        guard let session else { throw GojiError("No microphone session.") }
+        Log.audio.notice("opening \(self.deviceName, privacy: .public) (system default: \(MicDevices.systemDefaultInput()?.name ?? "none", privacy: .public))")
+
+        session.startRunning()
+        guard session.isRunning else {
+            Log.audio.error("session did not start for \(self.deviceName, privacy: .public)")
+            teardown()
+            throw GojiError("\(deviceName) didn't start.")
+        }
+        Log.audio.notice("session running after \(Log.ms(since: self.startedAt)) ms")
+    }
+
+    func stop() -> [Float] {
+        session?.stopRunning()
+        lock.lock()
+        defer { lock.unlock() }
+        return samples
+    }
+
+    /// The device the prepared session was built for is still the one this
+    /// UID resolves to (a setting of nil follows the system default, which can
+    /// change between dictations).
+    private func preparedFor(_ deviceUID: String?) -> Bool {
+        resolveDevice(deviceUID)?.uniqueID == preparedDeviceID
+    }
+
+    private func resolveDevice(_ deviceUID: String?) -> AVCaptureDevice? {
+        if let deviceUID, let chosen = AVCaptureDevice(uniqueID: deviceUID) {
+            return chosen
+        }
+        // Unset or unplugged: fall back to whatever the system default is.
+        return AVCaptureDevice.default(for: .audio)
+    }
+
+    private func buildSession(deviceUID: String?) throws -> (AVCaptureSession, AVCaptureDevice) {
+        guard let device = resolveDevice(deviceUID) else {
             Log.audio.error("no capture device for uid \(deviceUID ?? "default", privacy: .public)")
             throw GojiError("No microphone input available. Check mic permission in System Settings > Privacy & Security > Microphone.")
         }
         if let deviceUID, device.uniqueID != deviceUID {
             Log.audio.error("chosen mic \(deviceUID, privacy: .public) not found, using default \(device.localizedName, privacy: .public)")
         }
-        Log.audio.notice("opening \(device.localizedName, privacy: .public) (system default: \(MicDevices.systemDefaultInput()?.name ?? "none", privacy: .public))")
-        startedAt = Date()
-        deviceName = device.localizedName
 
         let session = AVCaptureSession()
         let input: AVCaptureDeviceInput
@@ -88,30 +142,16 @@ final class AudioRecorder: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
             throw GojiError("Couldn't read from \(device.localizedName).")
         }
         session.addOutput(output)
-
-        self.session = session
-        session.startRunning()
-        guard session.isRunning else {
-            Log.audio.error("session did not start for \(device.localizedName, privacy: .public)")
-            teardown()
-            throw GojiError("\(device.localizedName) didn't start.")
-        }
-        Log.audio.notice("session running after \(Log.ms(since: self.startedAt)) ms")
+        return (session, device)
     }
 
-    func stop() -> [Float] {
-        teardown()
-        lock.lock()
-        defer { lock.unlock() }
-        return samples
-    }
-
-    /// Stops capture and releases the session. Idempotent.
+    /// Stops capture and drops the session. Idempotent.
     private func teardown() {
         if let session, session.isRunning {
             session.stopRunning()
         }
         session = nil
+        preparedDeviceID = nil
     }
 
     func captureOutput(
