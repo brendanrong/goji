@@ -7,6 +7,7 @@ struct SettingsView: View {
     enum Pane: String, CaseIterable, Identifiable {
         case general
         case transcription
+        case apps
         case models
         case history
         case about
@@ -17,6 +18,7 @@ struct SettingsView: View {
             switch self {
             case .general: return "General"
             case .transcription: return "Transcription"
+            case .apps: return "Apps"
             case .models: return "Models"
             case .history: return "History"
             case .about: return "About"
@@ -27,6 +29,7 @@ struct SettingsView: View {
             switch self {
             case .general: return "gearshape"
             case .transcription: return "wand.and.stars"
+            case .apps: return "macwindow"
             case .models: return "cpu"
             case .history: return "clock"
             case .about: return "info.circle"
@@ -74,6 +77,7 @@ struct SettingsView: View {
             switch pane {
             case .general: GeneralPane()
             case .transcription: TranscriptionPane()
+            case .apps: AppsPane()
             case .models: ModelsPane()
             case .history: HistoryPane()
             case .about: AboutPane()

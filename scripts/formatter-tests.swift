@@ -69,7 +69,22 @@ let cases: [Case] = [
          "Hey, quick one\nCan you, check the deck?\n\nThanks!"),
 ]
 
+// Lowercase profile: names, acronyms, and replacements keep their case.
+let lowercaseCases: [(String, [String], String)] = [
+    ("Hey team, the PRD for Figma is in Jira.", ["Figma", "Jira"], "hey team, the PRD for Figma is in Jira."),
+    ("I think Q3 looks OK.", [], "i think Q3 looks OK."),
+    ("Ask Brendan Rong about AirPods.", ["Brendan Rong", "AirPods"], "ask Brendan Rong about AirPods."),
+    ("A plain sentence.", [], "a plain sentence."),
+]
+
 var failures = 0
+for (input, preserving, expected) in lowercaseCases {
+    let got = TranscriptCasing.lowercase(input, preserving: preserving)
+    if got != expected {
+        failures += 1
+        print("FAIL lowercase\n  in:  \(input.debugDescription)\n  exp: \(expected.debugDescription)\n  got: \(got.debugDescription)")
+    }
+}
 for c in cases {
     let got = TranscriptFormatter.format(c.input, options: c.options)
     if got != c.expected {
@@ -77,5 +92,5 @@ for c in cases {
         print("FAIL\n  in:  \(c.input.debugDescription)\n  exp: \(c.expected.debugDescription)\n  got: \(got.debugDescription)")
     }
 }
-print(failures == 0 ? "OK, \(cases.count) cases" : "\(failures) of \(cases.count) failed")
+print(failures == 0 ? "OK, \(cases.count + lowercaseCases.count) cases" : "\(failures) of \(cases.count + lowercaseCases.count) failed")
 exit(Int32(failures))

@@ -35,6 +35,9 @@ final class DictationController {
     /// True when we sent play/pause at recording start, so we resume after.
     private var pausedMedia = false
     private var recordingStartedAt: Date?
+    /// Bundle ID of the app being dictated into, captured at recording start
+    /// (Goji never activates itself, so frontmost == paste target).
+    private var targetBundleID: String?
     private var cancellables = Set<AnyCancellable>()
 
     init(state: AppState) {
@@ -303,6 +306,7 @@ final class DictationController {
                 }
             }
             recordingStartedAt = Date()
+            targetBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
             state.phase = .recording
             escape.arm()
             hud.show(.listening, style: settings.hudStyle)
@@ -380,14 +384,27 @@ final class DictationController {
                 // Resolving "scratch that" and "new paragraph" here means the
                 // AI pass (if on) only polishes and can't drop or merge them.
                 cleaned = TranscriptFormatter.format(cleaned, options: settings.formatterOptions)
-                if settings.cleanupEnabled {
+                let profile = settings.profile(for: targetBundleID)
+                if let profile {
+                    Log.dictation.notice("app profile: \(profile.name, privacy: .public)")
+                }
+                if settings.cleanupEnabled, profile?.aiCleanup ?? true {
                     let cleanupStart = Date()
                     cleaned = await Cleaner.cleanup(cleaned, vocabulary: settings.vocabularyTerms)
                     Log.dictation.notice("AI cleanup in \(Log.ms(since: cleanupStart)) ms")
                 }
                 cleaned = settings.applyReplacements(to: cleaned)
-                if settings.removeTrailingFullStop {
+                let dropFullStop: Bool
+                switch profile?.trailingFullStop ?? .inherit {
+                case .inherit: dropFullStop = settings.removeTrailingFullStop
+                case .drop: dropFullStop = true
+                case .keep: dropFullStop = false
+                }
+                if dropFullStop {
                     cleaned = Self.strippingTrailingFullStop(cleaned)
+                }
+                if profile?.casing == .lowercase {
+                    cleaned = TranscriptCasing.lowercase(cleaned, preserving: settings.preservedCaseTerms)
                 }
                 guard !cleaned.isEmpty else {
                     hud.hide()

@@ -278,6 +278,20 @@ final class SettingsStore: ObservableObject {
     @Published var vocabulary: [VocabWord] {
         didSet { persistVocabulary() }
     }
+    /// Per-app formatting, matched on the frontmost app's bundle ID.
+    @Published var appProfiles: [AppProfile] {
+        didSet { persistAppProfiles() }
+    }
+
+    func profile(for bundleID: String?) -> AppProfile? {
+        guard let bundleID else { return nil }
+        return appProfiles.first { $0.bundleID == bundleID }
+    }
+
+    /// Words whose exact spelling survives a lowercase profile.
+    var preservedCaseTerms: [String] {
+        vocabularyTerms + replacements.map { $0.replace.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
 
     /// Non-empty vocabulary entries, trimmed, ready for the cleanup prompt.
     var vocabularyTerms: [String] {
@@ -298,6 +312,8 @@ final class SettingsStore: ObservableObject {
         static let appearance = "appearance"
         static let replacements = "replacements"
         static let vocabulary = "vocabularyWords"
+        static let appProfiles = "appProfiles"
+        static let appProfilesSeeded = "appProfilesSeeded"
         static let showInMenuBar = "showInMenuBar"
         static let showInDock = "showInDock"
         static let micDeviceUID = "micDeviceUID"
@@ -361,6 +377,16 @@ final class SettingsStore: ObservableObject {
             vocabulary = words
         } else {
             vocabulary = []
+        }
+        if let data = d.data(forKey: Keys.appProfiles),
+           let profiles = try? JSONDecoder().decode([AppProfile].self, from: data) {
+            appProfiles = profiles
+        } else if d.bool(forKey: Keys.appProfilesSeeded) {
+            appProfiles = []
+        } else {
+            // First run: sensible defaults (Slack lowercase, editors raw).
+            appProfiles = AppProfile.defaults
+            d.set(true, forKey: Keys.appProfilesSeeded)
         }
     }
 
@@ -438,6 +464,11 @@ final class SettingsStore: ObservableObject {
     private func persistReplacements() {
         guard let data = try? JSONEncoder().encode(replacements) else { return }
         defaults.set(data, forKey: Keys.replacements)
+    }
+
+    private func persistAppProfiles() {
+        guard let data = try? JSONEncoder().encode(appProfiles) else { return }
+        defaults.set(data, forKey: Keys.appProfiles)
     }
 
     private func persistVocabulary() {
