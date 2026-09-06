@@ -22,6 +22,9 @@ final class AudioRecorder: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
     private let lock = NSLock()
     private var samples: [Float] = []
     private var buffersReceived = 0
+    private var startedAt = Date()
+    /// Name of the mic the last recording actually used (after any fallback).
+    private(set) var deviceName = "microphone"
 
     /// True when the mic was opened but never delivered a single buffer.
     /// That's the "audio system is wedged" signature; surface it to the user.
@@ -47,8 +50,15 @@ final class AudioRecorder: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
             device = AVCaptureDevice.default(for: .audio)
         }
         guard let device else {
+            Log.audio.error("no capture device for uid \(deviceUID ?? "default", privacy: .public)")
             throw GojiError("No microphone input available. Check mic permission in System Settings > Privacy & Security > Microphone.")
         }
+        if let deviceUID, device.uniqueID != deviceUID {
+            Log.audio.error("chosen mic \(deviceUID, privacy: .public) not found, using default \(device.localizedName, privacy: .public)")
+        }
+        Log.audio.notice("opening \(device.localizedName, privacy: .public) (system default: \(MicDevices.systemDefaultInput()?.name ?? "none", privacy: .public))")
+        startedAt = Date()
+        deviceName = device.localizedName
 
         let session = AVCaptureSession()
         let input: AVCaptureDeviceInput
@@ -82,9 +92,11 @@ final class AudioRecorder: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
         self.session = session
         session.startRunning()
         guard session.isRunning else {
+            Log.audio.error("session did not start for \(device.localizedName, privacy: .public)")
             teardown()
             throw GojiError("\(device.localizedName) didn't start.")
         }
+        Log.audio.notice("session running after \(Log.ms(since: self.startedAt)) ms")
     }
 
     func stop() -> [Float] {
@@ -122,7 +134,13 @@ final class AudioRecorder: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
         lock.lock()
         samples.append(contentsOf: chunk)
         buffersReceived += 1
+        let isFirst = buffersReceived == 1
         lock.unlock()
+        if isFirst {
+            // Key-down to first audio: the number that decides whether we
+            // need a pre-roll buffer (see planning/v1.2-plan.md, item 4).
+            Log.audio.notice("first buffer \(Log.ms(since: self.startedAt)) ms after start, \(frames) frames")
+        }
 
         // Level meter for the HUD waveform.
         var sum: Float = 0

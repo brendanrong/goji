@@ -252,11 +252,25 @@ final class DictationController {
         lockGraceWork = nil
     }
 
+    /// Every user-visible failure goes through here: menu line, red HUD
+    /// toast, and the log. Never fail silently.
+    private func fail(_ title: String, hint: String, offerMicPicker: Bool = false) {
+        Log.dictation.error("\(title, privacy: .public): \(hint, privacy: .public)")
+        state.lastError = "\(title). \(hint)"
+        hud.showFailure(title: title, hint: hint, offerMicPicker: offerMicPicker)
+    }
+
     private func beginRecording() {
-        guard state.phase == .idle, state.modelState == .ready else { return }
+        guard state.phase == .idle else { return }
+        guard state.modelState == .ready else {
+            Log.dictation.notice("hotkey down ignored, model state \(String(describing: self.state.modelState), privacy: .public)")
+            return
+        }
         state.lastError = nil
+        let pressedAt = Date()
         do {
             try recorder.start(deviceUID: settings.micDeviceUID)
+            Log.dictation.notice("recording started, capture up in \(Log.ms(since: pressedAt)) ms")
             switch settings.whileDictating {
             case .nothing:
                 break
@@ -283,7 +297,7 @@ final class DictationController {
                 Sounds.recordingStarted()
             }
         } catch {
-            state.lastError = "Mic failed: \(error.localizedDescription)"
+            fail("Mic didn't start", hint: error.localizedDescription, offerMicPicker: true)
         }
     }
 
@@ -297,11 +311,16 @@ final class DictationController {
         SystemAudio.restoreOutput()
         resumeMediaIfPaused()
 
+        let audioSeconds = Double(samples.count) / AudioRecorder.sampleRate
+        Log.dictation.notice("recording stopped: held \(Int(held * 1000)) ms, audio \(String(format: "%.2f", audioSeconds), privacy: .public) s")
+
         guard samples.count >= minimumSamples else {
             // Held long enough to speak but the mic never produced a buffer:
             // the audio device is dead, don't fail silently.
             if held >= 0.5, recorder.deliveredNoAudio {
-                state.lastError = "Mic delivered no audio. Try a different microphone in Settings, or reconnect Bluetooth headphones."
+                fail("No audio from \(recorder.deviceName)", hint: "Reconnect it, or switch mic:", offerMicPicker: true)
+            } else {
+                Log.dictation.notice("dropped as accidental tap")
             }
             state.phase = .idle
             hud.hide()
@@ -315,34 +334,55 @@ final class DictationController {
         }
 
         Task {
-            defer {
-                state.phase = .idle
-                hud.hide()
-            }
+            defer { state.phase = .idle }
             do {
+                let transcribeStart = Date()
                 let text = try await transcriber.transcribe(samples)
+                Log.dictation.notice("transcribed \(text.count) chars in \(Log.ms(since: transcribeStart)) ms")
                 var cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !cleaned.isEmpty else { return }
+                guard !cleaned.isEmpty else {
+                    Log.dictation.notice("empty transcript, nothing to paste")
+                    if audioSeconds >= 1.5 {
+                        // Plenty of audio, no words: usually a wrong or silent
+                        // mic (virtual device, muted headset), not the user.
+                        fail("Nothing heard from \(recorder.deviceName)", hint: "Wrong mic? Switch it here:", offerMicPicker: true)
+                    } else {
+                        hud.hide()
+                    }
+                    return
+                }
 
                 if settings.cleanupEnabled {
+                    let cleanupStart = Date()
                     cleaned = await Cleaner.cleanup(cleaned, vocabulary: settings.vocabularyTerms)
+                    Log.dictation.notice("AI cleanup in \(Log.ms(since: cleanupStart)) ms")
                 }
                 cleaned = settings.applyReplacements(to: cleaned)
                 if settings.removeTrailingFullStop {
                     cleaned = Self.strippingTrailingFullStop(cleaned)
                 }
-                guard !cleaned.isEmpty else { return }
+                guard !cleaned.isEmpty else {
+                    hud.hide()
+                    return
+                }
 
                 state.lastTranscript = cleaned
                 history.add(cleaned)
                 StatsStore.shared.record(
                     words: cleaned.split(whereSeparator: \.isWhitespace).count,
-                    seconds: Double(samples.count) / AudioRecorder.sampleRate
+                    seconds: audioSeconds
                 )
                 refreshAccessibility()
+                guard state.accessibilityGranted else {
+                    // Text is safe in History; tell them why it didn't land.
+                    fail("Couldn't paste", hint: "Grant Goji Accessibility in System Settings. Your text is in History.")
+                    return
+                }
                 inserter.insert(cleaned + " ")
+                Log.paste.notice("pasted \(cleaned.count) chars into \(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "unknown", privacy: .public)")
+                hud.hide()
             } catch {
-                state.lastError = "Transcription failed: \(error.localizedDescription)"
+                fail("Transcription failed", hint: error.localizedDescription)
             }
         }
     }
@@ -353,6 +393,7 @@ final class DictationController {
         escape.disarm()
         _ = recorder.stop()
         recordingStartedAt = nil
+        Log.dictation.notice("recording cancelled (Esc)")
         SystemAudio.restoreOutput()
         resumeMediaIfPaused()
         state.phase = .idle

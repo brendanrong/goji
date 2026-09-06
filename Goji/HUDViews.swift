@@ -7,7 +7,121 @@ final class HUDModel: ObservableObject {
     @Published var visible = false
     /// Icon of the app being dictated into, captured at recording start.
     @Published var frontAppIcon: NSImage?
+    /// Changes on every failure so the toast's countdown restarts.
+    @Published var failureID = UUID()
+    /// Failure toast shows an inline mic menu (mic-related failures only).
+    @Published var offerMicPicker = false
+    /// Called by the toast when its countdown runs out.
+    var onFailureExpired: (() -> Void)?
 }
+
+/// Bottom-of-screen failure toast: red glyph, short title, one-line hint, an
+/// optional inline mic menu, and a thin bar draining left-to-right so it's
+/// obvious it will go away. Hovering pauses the countdown.
+struct FailureToastView: View {
+    @ObservedObject var model: HUDModel
+
+    var body: some View {
+        Group {
+            if case .failed(let title, let hint) = model.mode {
+                FailureToastBody(
+                    title: title,
+                    hint: hint,
+                    offerMicPicker: model.offerMicPicker,
+                    onExpire: { model.onFailureExpired?() }
+                )
+                .id(model.failureID)
+            }
+        }
+        .scaleEffect(model.visible ? 1 : 0.9)
+        .opacity(model.visible ? 1 : 0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.75), value: model.visible)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+private struct FailureToastBody: View {
+    let title: String
+    let hint: String
+    let offerMicPicker: Bool
+    let onExpire: () -> Void
+
+    @ObservedObject private var settings = SettingsStore.shared
+    @State private var remaining = HUDController.failureDuration
+    @State private var hovering = false
+    @State private var expired = false
+    @State private var devices = MicDevices.inputDevices()
+    private let tick = Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.circle.fill")
+                .font(.system(size: 18))
+                .foregroundStyle(.red)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+                HStack(spacing: 8) {
+                    Text(hint)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    if offerMicPicker {
+                        Spacer(minLength: 4)
+                        Picker("", selection: $settings.micDeviceUID) {
+                            Text("System Default").tag(String?.none)
+                            ForEach(devices) { device in
+                                Text(device.name).tag(String?.some(device.uid))
+                            }
+                        }
+                        .labelsHidden()
+                        .controlSize(.small)
+                        .frame(maxWidth: 190)
+                        .onChange(of: settings.micDeviceUID) { _, _ in
+                            // Picked a mic: job done, get out of the way.
+                            Log.audio.notice("mic changed from failure toast")
+                            expire()
+                        }
+                    }
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(alignment: .bottom) {
+            GeometryReader { geo in
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(.red.opacity(hovering ? 0.35 : 0.7))
+                    .frame(width: geo.size.width * CGFloat(remaining / HUDController.failureDuration), height: 2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(height: 2)
+            .padding(.horizontal, 14)
+            .padding(.bottom, 4)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(.red.opacity(0.35), lineWidth: 1)
+        }
+        .onHover { hovering = $0 }
+        .onReceive(tick) { _ in
+            guard !hovering, !expired else { return }
+            remaining -= 1.0 / 30.0
+            if remaining <= 0 { expire() }
+        }
+    }
+
+    private func expire() {
+        guard !expired else { return }
+        expired = true
+        remaining = 0
+        onExpire()
+    }
+}
+
 
 /// Live waveform bars driven by the real mic level.
 struct WaveformBars: View {

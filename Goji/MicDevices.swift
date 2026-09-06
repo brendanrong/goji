@@ -18,6 +18,22 @@ enum MicDevices {
         }
     }
 
+    /// The system default input right now (what AVAudioEngine would have bound to).
+    static func systemDefaultInput() -> Device? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        var id = AudioDeviceID(0)
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &id) == noErr,
+              id != 0,
+              let uid = stringProperty(id, selector: kAudioDevicePropertyDeviceUID),
+              let name = stringProperty(id, selector: kAudioObjectPropertyName) else { return nil }
+        return Device(uid: uid, name: name)
+    }
+
     static func deviceID(forUID uid: String) -> AudioDeviceID? {
         allDeviceIDs().first { id in
             hasInput(id) && stringProperty(id, selector: kAudioDevicePropertyDeviceUID) == uid

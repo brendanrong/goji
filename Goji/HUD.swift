@@ -8,13 +8,22 @@ import SwiftUI
 /// Non-activating panel so focus stays in the app being dictated into.
 @MainActor
 final class HUDController {
-    enum Mode {
+    enum Mode: Equatable {
         case listening
         case transcribing
+        /// Something went wrong: a short title plus a one-line hint, shown
+        /// briefly with a draining countdown bar, then auto-hides.
+        case failed(title: String, hint: String)
     }
+
+    /// How long a failure toast stays up. The countdown bar drains over this.
+    static let failureDuration: TimeInterval = 4.0
 
     private enum Placement: Equatable {
         case bottomPanel
+        /// Wider bottom capsule for a failure reason. Used for both HUD styles:
+        /// the notch wings have no room for text.
+        case failureToast
         /// Physical notch cutout: wings hug the real notch.
         case notch(NSRect)
         /// No hardware notch (external monitor, older Mac): draw a fake notch
@@ -29,8 +38,11 @@ final class HUDController {
     private var panel: NSPanel?
     private var currentPlacement: Placement?
     private let model = HUDModel()
+    private var failureDismiss: DispatchWorkItem?
 
     func show(_ mode: Mode, style: HUDStyle) {
+        failureDismiss?.cancel()
+        failureDismiss = nil
         if mode == .listening {
             // The app being dictated into. Goji never activates itself, so the
             // frontmost app at recording start is the paste target.
@@ -39,6 +51,41 @@ final class HUDController {
         model.mode = mode
         guard let screen = targetScreen else { return }
         let placement = placement(for: style, on: screen)
+        present(placement, on: screen)
+    }
+
+    /// Red card with a title and hint, visible for a few seconds. Replaces
+    /// whatever the HUD was showing; a new dictation replaces it in turn.
+    /// `offerMicPicker` adds an inline mic menu so a wrong or dead mic can be
+    /// fixed right there. The view owns the countdown (it pauses on hover) and
+    /// calls back when it expires; the timer here is only a safety net.
+    func showFailure(title: String, hint: String, offerMicPicker: Bool = false) {
+        failureDismiss?.cancel()
+        model.mode = .failed(title: title, hint: hint)
+        model.offerMicPicker = offerMicPicker
+        model.failureID = UUID()  // restarts the countdown bar
+        model.onFailureExpired = { [weak self] in
+            guard let self, case .failed = self.model.mode else { return }
+            self.dismiss()
+        }
+        guard let screen = targetScreen else { return }
+        present(.failureToast, on: screen)
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, case .failed = self.model.mode else { return }
+            self.dismiss()
+        }
+        failureDismiss = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 60, execute: work)
+    }
+
+    func hide() {
+        // A failure toast has its own timer; don't let the normal
+        // end-of-dictation hide cut it short.
+        if case .failed = model.mode { return }
+        dismiss()
+    }
+
+    private func present(_ placement: Placement, on screen: NSScreen) {
         if panel == nil || placement != currentPlacement {
             rebuild(for: placement, on: screen)
         } else if let panel {
@@ -50,7 +97,7 @@ final class HUDController {
         model.visible = true
     }
 
-    func hide() {
+    private func dismiss() {
         model.visible = false
         // Let the exit animation play before the panel disappears.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
@@ -130,6 +177,14 @@ final class HUDController {
             newPanel = makePanel(size: NSSize(width: 180, height: 44))
             newPanel.level = .statusBar
             newPanel.contentView = NSHostingView(rootView: PanelHUDView(model: model))
+        case .failureToast:
+            newPanel = makePanel(size: NSSize(width: 460, height: 72))
+            newPanel.level = .statusBar
+            // The only HUD that takes clicks (the inline mic menu). Still
+            // non-activating, so the app being dictated into keeps focus.
+            newPanel.ignoresMouseEvents = false
+            newPanel.becomesKeyOnlyIfNeeded = true
+            newPanel.contentView = NSHostingView(rootView: FailureToastView(model: model))
         case .notch(let notch):
             // Barely wider than the notch and EXACTLY its height: Willow-style
             // wings beside the notch, flush with the menu bar, nothing below it.
@@ -167,7 +222,7 @@ final class HUDController {
     private func position(_ panel: NSPanel, placement: Placement, on screen: NSScreen) {
         let size = panel.frame.size
         switch placement {
-        case .bottomPanel:
+        case .bottomPanel, .failureToast:
             let frame = screen.visibleFrame
             panel.setFrameOrigin(NSPoint(x: frame.midX - size.width / 2, y: frame.minY + 60))
         case .notch, .syntheticNotch:

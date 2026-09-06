@@ -80,6 +80,10 @@ struct MenuContent: View {
             }
             .keyboardShortcut(",")
 
+            Button("Copy Diagnostics") {
+                Diagnostics.copyToClipboard(state: state)
+            }
+
             Button("Quit Goji") {
                 NSApp.terminate(nil)
             }
