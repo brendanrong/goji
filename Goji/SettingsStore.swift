@@ -249,11 +249,15 @@ final class SettingsStore: ObservableObject {
     @Published var collapseStutters: Bool {
         didSet { defaults.set(collapseStutters, forKey: Keys.collapseStutters) }
     }
+    @Published var numbersAsDigits: Bool {
+        didSet { defaults.set(numbersAsDigits, forKey: Keys.numbersAsDigits) }
+    }
     var formatterOptions: TranscriptFormatter.Options {
         TranscriptFormatter.Options(
             spokenCommands: spokenCommands,
             removeFillers: removeFillers,
-            collapseStutters: collapseStutters
+            collapseStutters: collapseStutters,
+            numbersAsDigits: numbersAsDigits
         )
     }
     /// Ask GitHub once a day whether a newer release exists.
@@ -335,6 +339,7 @@ final class SettingsStore: ObservableObject {
         static let lowercaseEverything = "lowercaseEverything"
         static let removeFillers = "removeFillers"
         static let collapseStutters = "collapseStutters"
+        static let numbersAsDigits = "numbersAsDigits"
         static let autoCheckUpdates = "autoCheckUpdates"
     }
 
@@ -372,6 +377,7 @@ final class SettingsStore: ObservableObject {
         lowercaseEverything = d.bool(forKey: Keys.lowercaseEverything)
         removeFillers = (d.object(forKey: Keys.removeFillers) as? Bool) ?? true
         collapseStutters = (d.object(forKey: Keys.collapseStutters) as? Bool) ?? true
+        numbersAsDigits = (d.object(forKey: Keys.numbersAsDigits) as? Bool) ?? true
         autoCheckUpdates = (d.object(forKey: Keys.autoCheckUpdates) as? Bool) ?? true
         if let data = d.data(forKey: Keys.replacements),
            let rules = try? JSONDecoder().decode([ReplacementRule].self, from: data) {

@@ -289,6 +289,12 @@ struct TranscriptionPane: View {
                         .labelsHidden()
                 }
                 Divider()
+                SettingsRow("Numbers as digits",
+                            subtitle: "\"eighty kilos\" becomes \"80 kilos\", \"five point one\" becomes \"5.1\". One to nine stay as words.") {
+                    Toggle("Numbers as digits", isOn: $settings.numbersAsDigits)
+                        .labelsHidden()
+                }
+                Divider()
                 SettingsRow("lowercase everything",
                             subtitle: "Like you never touched Shift. Names & phrases, acronyms, and replacements keep their case. Apps can override this.") {
                     Toggle("lowercase everything", isOn: $settings.lowercaseEverything)

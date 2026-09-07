@@ -4,9 +4,10 @@
 import Foundation
 
 let all = TranscriptFormatter.Options.all
-let commandsOnly = TranscriptFormatter.Options(spokenCommands: true, removeFillers: false, collapseStutters: false)
-let fillersOnly = TranscriptFormatter.Options(spokenCommands: false, removeFillers: true, collapseStutters: false)
-let stuttersOnly = TranscriptFormatter.Options(spokenCommands: false, removeFillers: false, collapseStutters: true)
+let commandsOnly = TranscriptFormatter.Options(spokenCommands: true, removeFillers: false, collapseStutters: false, numbersAsDigits: false)
+let fillersOnly = TranscriptFormatter.Options(spokenCommands: false, removeFillers: true, collapseStutters: false, numbersAsDigits: false)
+let stuttersOnly = TranscriptFormatter.Options(spokenCommands: false, removeFillers: false, collapseStutters: true, numbersAsDigits: false)
+let numbersOnly = TranscriptFormatter.Options(spokenCommands: false, removeFillers: false, collapseStutters: false, numbersAsDigits: true)
 
 struct Case {
     let input: String
@@ -61,6 +62,28 @@ let cases: [Case] = [
     Case("Plan is set. We ship Friday, scratch that, Monday.", "Plan is set. Monday.", commandsOnly),
     Case("Scratch that, start again.", "Start again.", commandsOnly),
     Case("First. Second scratch that third. Fourth scratch that fifth.", "First. Third. Fifth.", commandsOnly),
+
+    // Numbers
+    Case("I can pull up eighty kilos.", "I can pull up 80 kilos.", numbersOnly),
+    Case("It costs a hundred dollars to enter.", "It costs 100 dollars to enter.", numbersOnly),
+    Case("Fable Five Point One wins.", "Fable 5.1 wins.", numbersOnly),
+    Case("A fifteen-year-old question.", "A 15-year-old question.", numbersOnly),
+    Case("The fifteenth thingy.", "The 15th thingy.", numbersOnly),
+    Case("Twenty first of March.", "21st of March.", numbersOnly),
+    Case("One hundred and twenty three people.", "123 people.", numbersOnly),
+    Case("Two thousand and twenty six.", "2026.", numbersOnly),
+    Case("Three point five million users.", "3.5 million users.", numbersOnly),
+    Case("One thing, two things, nine things.", "One thing, two things, nine things.", numbersOnly),
+    Case("First, we ship. Second, we test.", "First, we ship. Second, we test.", numbersOnly),
+    Case("Call zero zero seven.", "Call zero zero seven.", numbersOnly),
+    Case("A hundred percent.", "100 percent.", numbersOnly),
+    Case("Ten and a half.", "10 and a half.", numbersOnly),
+    Case("So GPT six is out.", "So GPT 6 is out.", numbersOnly),
+    Case("Q three results and iOS nine.", "Q3 results and iOS 9.", numbersOnly),
+    Case("Do step three, then version two.", "Do step 3, then version 2.", numbersOnly),
+    Case("Eight kilos, five percent, three pm.", "8 kilos, 5 percent, 3 pm.", numbersOnly),
+    Case("I have two dogs and one cat.", "I have two dogs and one cat.", numbersOnly),
+    Case("I mean, three of them.", "I mean, three of them.", numbersOnly),
 
     // Everything together (the plan's done-when case)
     Case("um so the the plan is new paragraph we ship scratch that we test first",
