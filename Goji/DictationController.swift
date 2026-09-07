@@ -83,6 +83,11 @@ final class DictationController {
             .store(in: &cancellables)
 
 
+        // First AI cleanup of the session shouldn't pay the cold-start.
+        if settings.cleanupEnabled {
+            Cleaner.prewarm(vocabulary: settings.vocabularyTerms)
+        }
+
         if Transcriber.modelsAvailableLocally || Transcriber.availableLocally(settings.selectedModel) {
             // Returning user: mic is long granted, so this prompt (which only
             // fires when NOT yet trusted) has the stage to itself.
@@ -403,7 +408,13 @@ final class DictationController {
                 if dropFullStop {
                     cleaned = Self.strippingTrailingFullStop(cleaned)
                 }
-                if profile?.casing == .lowercase {
+                let lowercase: Bool
+                switch profile?.casing ?? .inherit {
+                case .inherit: lowercase = settings.lowercaseEverything
+                case .lowercase: lowercase = true
+                case .asSpoken: lowercase = false
+                }
+                if lowercase {
                     cleaned = TranscriptCasing.lowercase(cleaned, preserving: settings.preservedCaseTerms)
                 }
                 guard !cleaned.isEmpty else {
