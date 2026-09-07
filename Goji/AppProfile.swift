@@ -6,13 +6,16 @@ import Foundation
 /// Transcription settings.
 struct AppProfile: Codable, Identifiable, Equatable {
     enum Casing: String, Codable, CaseIterable {
-        /// Whatever the model produced (sentence case).
+        /// Follow the global "lowercase everything" setting.
+        case inherit
+        /// Whatever the model produced (sentence case), even if global is lowercase.
         case asSpoken
         /// Everything lowercase except names, acronyms, and your replacements.
         case lowercase
 
         var label: String {
             switch self {
+            case .inherit: return "Default"
             case .asSpoken: return "As spoken"
             case .lowercase: return "lowercase"
             }
@@ -34,7 +37,7 @@ struct AppProfile: Codable, Identifiable, Equatable {
     var id = UUID()
     var bundleID: String
     var name: String
-    var casing: Casing = .asSpoken
+    var casing: Casing = .inherit
     var trailingFullStop: TrailingFullStop = .inherit
     /// Off skips Apple Intelligence cleanup for this app even when it's on
     /// globally (editors and terminals want predictable text).

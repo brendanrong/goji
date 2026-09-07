@@ -235,6 +235,10 @@ final class SettingsStore: ObservableObject {
     @Published var removeTrailingFullStop: Bool {
         didSet { defaults.set(removeTrailingFullStop, forKey: Keys.removeTrailingFullStop) }
     }
+    /// Lowercase every transcript (names, acronyms, replacements keep their case).
+    @Published var lowercaseEverything: Bool {
+        didSet { defaults.set(lowercaseEverything, forKey: Keys.lowercaseEverything) }
+    }
     /// Deterministic cleanup (TranscriptFormatter), no model needed.
     @Published var spokenCommands: Bool {
         didSet { defaults.set(spokenCommands, forKey: Keys.spokenCommands) }
@@ -314,6 +318,7 @@ final class SettingsStore: ObservableObject {
         static let vocabulary = "vocabularyWords"
         static let appProfiles = "appProfiles"
         static let appProfilesSeeded = "appProfilesSeeded"
+        static let appProfilesCasingV2 = "appProfilesCasingV2"
         static let showInMenuBar = "showInMenuBar"
         static let showInDock = "showInDock"
         static let micDeviceUID = "micDeviceUID"
@@ -327,6 +332,7 @@ final class SettingsStore: ObservableObject {
         static let cleanupEnabled = "cleanupEnabled"
         static let removeTrailingFullStop = "removeTrailingFullStop"
         static let spokenCommands = "spokenCommands"
+        static let lowercaseEverything = "lowercaseEverything"
         static let removeFillers = "removeFillers"
         static let collapseStutters = "collapseStutters"
         static let autoCheckUpdates = "autoCheckUpdates"
@@ -363,6 +369,7 @@ final class SettingsStore: ObservableObject {
         cleanupEnabled = d.bool(forKey: Keys.cleanupEnabled)
         removeTrailingFullStop = d.bool(forKey: Keys.removeTrailingFullStop)
         spokenCommands = (d.object(forKey: Keys.spokenCommands) as? Bool) ?? true
+        lowercaseEverything = d.bool(forKey: Keys.lowercaseEverything)
         removeFillers = (d.object(forKey: Keys.removeFillers) as? Bool) ?? true
         collapseStutters = (d.object(forKey: Keys.collapseStutters) as? Bool) ?? true
         autoCheckUpdates = (d.object(forKey: Keys.autoCheckUpdates) as? Bool) ?? true
@@ -379,7 +386,15 @@ final class SettingsStore: ObservableObject {
             vocabulary = []
         }
         if let data = d.data(forKey: Keys.appProfiles),
-           let profiles = try? JSONDecoder().decode([AppProfile].self, from: data) {
+           var profiles = try? JSONDecoder().decode([AppProfile].self, from: data) {
+            // Before the global lowercase toggle, "As spoken" was the default and
+            // meant "no override". Map it to Default once.
+            if !d.bool(forKey: Keys.appProfilesCasingV2) {
+                for i in profiles.indices where profiles[i].casing == .asSpoken {
+                    profiles[i].casing = .inherit
+                }
+                d.set(true, forKey: Keys.appProfilesCasingV2)
+            }
             appProfiles = profiles
         } else if d.bool(forKey: Keys.appProfilesSeeded) {
             appProfiles = []

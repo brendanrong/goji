@@ -289,6 +289,12 @@ struct TranscriptionPane: View {
                         .labelsHidden()
                 }
                 Divider()
+                SettingsRow("lowercase everything",
+                            subtitle: "Like you never touched Shift. Names & phrases, acronyms, and replacements keep their case. Apps can override this.") {
+                    Toggle("lowercase everything", isOn: $settings.lowercaseEverything)
+                        .labelsHidden()
+                }
+                Divider()
                 SettingsRow("Remove the full stop at the end",
                             subtitle: "Drops the final period the model adds to every dictation. Question marks and exclamations stay.") {
                     Toggle("Remove the full stop at the end", isOn: $settings.removeTrailingFullStop)
