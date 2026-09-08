@@ -196,6 +196,13 @@ final class DictationController {
         state.accessibilityGranted = Permissions.accessibilityGranted
     }
 
+    /// Takes back the last paste (menu action).
+    func undoLastInsertion() {
+        if !inserter.undoLast() {
+            fail("Nothing to undo", hint: "Undo works in the app the text was pasted into.")
+        }
+    }
+
     /// Re-inserts the most recent transcript at the cursor.
     func insertLast() {
         guard let last = history.last else { return }
