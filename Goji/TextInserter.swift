@@ -5,6 +5,12 @@ import ApplicationServices
 /// then restore whatever string was on the pasteboard. Requires Accessibility.
 @MainActor
 final class TextInserter {
+    /// Detection of a refused paste is on; the keystroke fallback is off until
+    /// the logs show the AX length check never misfires (a stale AXValue in
+    /// some Electron field would otherwise mean a double insert). Flip after
+    /// a week of "paste not taken" lines that were all real.
+    static let typeWhenPasteFails = false
+
     /// What the last paste put down and where, so it can be taken back.
     private(set) var lastInserted: String?
     private(set) var lastTargetBundleID: String?
@@ -14,11 +20,33 @@ final class TextInserter {
         lastTargetBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
         let pasteboard = NSPasteboard.general
         let saved = snapshot(pasteboard)
+        let lengthBefore = focusedTextLength()
 
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
         let ourChangeCount = pasteboard.changeCount
         postCommandV()
+
+        // Some fields refuse Cmd+V (secure inputs, a few terminals and
+        // Electron editors). When the field exposes its text, check that it
+        // grew; if it didn't, type the text as keystrokes instead. Fields we
+        // can't read are assumed fine: typing blind risks a double insert.
+        if let lengthBefore {
+            let needed = max(1, (text as NSString).length / 2)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { [weak self] in
+                guard let self else { return }
+                guard NSWorkspace.shared.frontmostApplication?.bundleIdentifier == self.lastTargetBundleID else { return }
+                if let after = self.focusedTextLength(), after - lengthBefore < needed {
+                    let app = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "unknown"
+                    if Self.typeWhenPasteFails {
+                        Log.paste.error("paste not taken in \(app, privacy: .public) (field grew \(after - lengthBefore) of \(text.count) chars), typing instead")
+                        self.typeText(text)
+                    } else {
+                        Log.paste.error("paste not taken in \(app, privacy: .public) (field grew \(after - lengthBefore) of \(text.count) chars); typing fallback is off")
+                    }
+                }
+            }
+        }
 
         // Restore the original clipboard once the paste has had time to land,
         // but only if nothing newer was copied in the meantime. Electron apps
@@ -81,6 +109,41 @@ final class TextInserter {
         var target = CFRange(location: caret.location - length, length: length)
         guard let targetValue = AXValueCreate(.cfRange, &target) else { return false }
         return AXUIElementSetAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, targetValue) == .success
+    }
+
+    /// UTF-16 length of the focused field's text, nil if it can't be read.
+    private func focusedTextLength() -> Int? {
+        let systemWide = AXUIElementCreateSystemWide()
+        var focusedRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
+              let focused = focusedRef else { return nil }
+        var valueRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(focused as! AXUIElement, kAXValueAttribute as CFString, &valueRef) == .success,
+              let value = valueRef as? String else { return nil }
+        return (value as NSString).length
+    }
+
+    /// Types text as synthetic keystrokes. Line breaks go as Return so
+    /// editors treat them as real newlines.
+    private func typeText(_ text: String) {
+        let source = CGEventSource(stateID: .combinedSessionState)
+        let lines = text.components(separatedBy: "\n")
+        for (index, line) in lines.enumerated() {
+            var remaining = Substring(line)
+            while !remaining.isEmpty {
+                let chunk = remaining.prefix(20)
+                remaining = remaining.dropFirst(chunk.count)
+                var units = Array(chunk.utf16)
+                let down = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true)
+                down?.keyboardSetUnicodeString(stringLength: units.count, unicodeString: &units)
+                down?.post(tap: .cghidEventTap)
+                let up = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false)
+                up?.post(tap: .cghidEventTap)
+            }
+            if index < lines.count - 1 {
+                postKey(36, flags: [])  // Return
+            }
+        }
     }
 
     /// Deep-copies every item on the pasteboard so it can be put back after we
