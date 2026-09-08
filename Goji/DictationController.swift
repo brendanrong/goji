@@ -434,8 +434,12 @@ final class DictationController {
                     fail("Couldn't paste", hint: "Grant Goji Accessibility in System Settings. Your text is in History.")
                     return
                 }
-                inserter.insert(cleaned + " ")
-                Log.paste.notice("pasted \(cleaned.count) chars into \(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "unknown", privacy: .public)")
+                // Fit the text to the caret: leading space, first-letter case,
+                // trailing space, based on what's already in the field.
+                let context = CursorContext.read()
+                let shaped = InsertionShaper.shape(cleaned, context: context, preserveCase: settings.preservedCaseTerms)
+                inserter.insert(shaped)
+                Log.paste.notice("pasted \(shaped.count) chars into \(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "unknown", privacy: .public) (caret context: \(context == nil ? "unavailable" : "read", privacy: .public))")
                 hud.hide()
             } catch {
                 fail("Transcription failed", hint: error.localizedDescription)

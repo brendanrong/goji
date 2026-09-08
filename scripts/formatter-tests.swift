@@ -119,7 +119,34 @@ let lowercaseCases: [(String, [String], String)] = [
     ("A plain sentence.", [], "a plain sentence."),
 ]
 
+// Caret shaping: (text, before, after, expected). nil context = old behaviour.
+typealias Ctx = InsertionShaper.Context
+let shapeCases: [(String, Ctx?, String)] = [
+    ("Hello there", nil, "Hello there "),
+    ("Hello there", Ctx(before: "", after: ""), "Hello there "),
+    ("Hello there", Ctx(before: "Hi team. ", after: ""), "Hello there "),
+    ("Hello there", Ctx(before: "Hi team.", after: ""), " Hello there "),
+    ("And then we ship", Ctx(before: "We test first", after: ""), " and then we ship "),
+    ("And then we ship", Ctx(before: "We test first ", after: ""), "and then we ship "),
+    ("I think so", Ctx(before: "Well", after: ""), " I think so "),
+    ("PRD is ready", Ctx(before: "the", after: ""), " PRD is ready "),
+    ("Figma is ready", Ctx(before: "the", after: ""), " figma is ready "),
+    ("Hello", Ctx(before: "(", after: ")"), "Hello"),
+    ("Hello", Ctx(before: "\"", after: "\""), "Hello"),
+    ("Hello", Ctx(before: "Line one\n", after: ""), "Hello "),
+    ("Hello", Ctx(before: "Hi", after: " there"), " hello"),
+    ("Hello", Ctx(before: "Hi ", after: "there"), "hello "),
+    ("Really", Ctx(before: "Is it", after: "?"), " really"),
+]
+
 var failures = 0
+for (text, ctx, expected) in shapeCases {
+    let got = InsertionShaper.shape(text, context: ctx, preserveCase: ["Figma"].filter { _ in false })
+    if got != expected {
+        failures += 1
+        print("FAIL shape\n  in:  \(text.debugDescription) before=\(ctx?.before.debugDescription ?? "nil") after=\(ctx?.after.debugDescription ?? "nil")\n  exp: \(expected.debugDescription)\n  got: \(got.debugDescription)")
+    }
+}
 for (input, preserving, expected) in lowercaseCases {
     let got = TranscriptCasing.lowercase(input, preserving: preserving)
     if got != expected {
@@ -134,5 +161,6 @@ for c in cases {
         print("FAIL\n  in:  \(c.input.debugDescription)\n  exp: \(c.expected.debugDescription)\n  got: \(got.debugDescription)")
     }
 }
-print(failures == 0 ? "OK, \(cases.count + lowercaseCases.count) cases" : "\(failures) of \(cases.count + lowercaseCases.count) failed")
+let total = cases.count + lowercaseCases.count + shapeCases.count
+print(failures == 0 ? "OK, \(total) cases" : "\(failures) of \(total) failed")
 exit(Int32(failures))
