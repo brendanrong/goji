@@ -8,7 +8,15 @@ Everything runs on your Mac. The speech model, the cleanup, the history. Nothing
 
 Download the latest `Goji.dmg` from the [Releases page](https://github.com/brendanrong/goji/releases), open it, drag Goji into Applications. Signed and notarized, so it opens without Gatekeeper drama.
 
+Or with Homebrew:
+
+```
+brew install --cask brendanrong/goji/goji
+```
+
 First launch: grant Microphone (macOS asks), grant Accessibility (needed to paste), and approve the one-time speech model download (about 600 MB, comes down fast). After that it works fully offline.
+
+On a machine that can't reach GitHub or HuggingFace at first run (locked-down work laptops), grab `Goji-with-model.dmg` from the same release instead: the speech model is inside the app, so nothing needs downloading.
 
 From then on Goji updates itself: one click in the menu bar when a new version is out.
 

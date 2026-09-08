@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import SwiftUI
 
 /// Content of the first-run window: explains the one-time model download,
@@ -74,14 +75,13 @@ struct WelcomeView: View {
 
         case .ready:
             VStack(spacing: 12) {
-                Label("Ready to go", systemImage: "checkmark.circle.fill")
+                Label("Speech model ready", systemImage: "checkmark.circle.fill")
                     .font(.headline)
                     .foregroundStyle(.green)
-                Text("Hold \(settings.hotkeyKey.shortLabel), speak, release. Grant Microphone and Accessibility if macOS asks.")
+                PermissionsChecklist(controller: controller)
+                Text("Hold \(settings.hotkeyKey.shortLabel), speak, release.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
                 Button("Start Dictating") {
                     WelcomeWindow.shared.close()
                 }
@@ -98,6 +98,53 @@ struct WelcomeView: View {
                 Button("Retry Download") {
                     controller.downloadModels()
                 }
+            }
+        }
+    }
+}
+
+/// The two permissions Goji can't work without, with live ticks. Polls while
+/// visible so granting in System Settings flips the row without a relaunch.
+struct PermissionsChecklist: View {
+    let controller: DictationController
+    @State private var micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+    @State private var axGranted = Permissions.accessibilityGranted
+    private let tick = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            row(granted: micGranted, title: "Microphone", hint: "So Goji can hear you.") {
+                Permissions.requestMicrophone()
+                if AVCaptureDevice.authorizationStatus(for: .audio) == .denied,
+                   let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+            row(granted: axGranted, title: "Accessibility", hint: "So Goji can paste where your cursor is.") {
+                Permissions.promptAccessibility()
+                Permissions.openAccessibilitySettings()
+            }
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 10).fill(.quinary))
+        .onReceive(tick) { _ in
+            micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+            axGranted = Permissions.accessibilityGranted
+            controller.refreshAccessibility()
+        }
+    }
+
+    private func row(granted: Bool, title: String, hint: String, grant: @escaping () -> Void) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: granted ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(granted ? .green : .secondary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title).font(.callout)
+                Text(hint).font(.caption2).foregroundStyle(.secondary)
+            }
+            Spacer()
+            if !granted {
+                Button("Grant…", action: grant).controlSize(.small)
             }
         }
     }

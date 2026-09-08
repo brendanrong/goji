@@ -5,6 +5,7 @@
 # Usage:
 #   bash make-dmg.sh                  # build + Developer ID sign + DMG
 #   BUNDLE_MODEL=1 bash make-dmg.sh   # also copy your local Parakeet model into the app (~600 MB DMG, zero-download install)
+#   DMG_NAME=Goji-with-model.dmg ...  # output file name (default Goji.dmg; must stay Goji.dmg for the update link)
 #   NOTARIZE=1 bash make-dmg.sh       # additionally submit to Apple notary + staple
 #
 # Signing: apps are signed with the Developer ID Application cert in the login
@@ -21,8 +22,10 @@ IDENTITY="${IDENTITY:-Developer ID Application}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-goji-notary}"
 
 DERIVED=/tmp/goji-build
-rm -rf "$DERIVED" dist
+DMG_NAME="${DMG_NAME:-Goji.dmg}"
+rm -rf "$DERIVED"
 mkdir -p dist
+rm -f "dist/$DMG_NAME"
 
 xcodebuild -scheme Goji -configuration Release -derivedDataPath "$DERIVED" build
 APP="$DERIVED/Build/Products/Release/Goji.app"
@@ -95,12 +98,12 @@ OSA
 
 sync
 hdiutil detach /Volumes/Goji
-hdiutil convert "$RW" -format UDZO -imagekey zlib-level=9 -ov -o dist/Goji.dmg
+hdiutil convert "$RW" -format UDZO -imagekey zlib-level=9 -ov -o "dist/$DMG_NAME"
 rm -f "$RW"
 
 if [[ "${NOTARIZE:-0}" == "1" ]]; then
-  xcrun notarytool submit dist/Goji.dmg --keychain-profile "$NOTARY_PROFILE" --wait
-  xcrun stapler staple dist/Goji.dmg
+  xcrun notarytool submit "dist/$DMG_NAME" --keychain-profile "$NOTARY_PROFILE" --wait
+  xcrun stapler staple "dist/$DMG_NAME"
 fi
 
-echo "Done: dist/Goji.dmg"
+echo "Done: dist/$DMG_NAME"

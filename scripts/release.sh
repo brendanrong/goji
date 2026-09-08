@@ -35,10 +35,21 @@ NOTES="release-notes/${TAG}.md"
 [[ -f "$NOTES" ]] || { echo "No release notes at $NOTES. Create it, then re-run."; exit 1; }
 
 # --- build + dmg (+ notarize) ---
+# Two DMGs: the slim Goji.dmg (the update link and the cask point here) and
+# Goji-with-model.dmg with the speech model baked in for first installs on
+# machines that can't or shouldn't pull 600 MB from GitHub.
 echo "==> Building and packaging with Xcode (a few minutes)..."
 NOTARIZE="${NOTARIZE:-1}" bash make-dmg.sh
 DMG="dist/Goji.dmg"
 [[ -f "$DMG" ]] || { echo "Expected $DMG but it is missing."; exit 1; }
+FULL_DMG=""
+if [[ -d "$HOME/Library/Application Support/FluidAudio/Models/parakeet-tdt-0.6b-v3" ]]; then
+  echo "==> Building the bundled-model DMG..."
+  NOTARIZE="${NOTARIZE:-1}" BUNDLE_MODEL=1 DMG_NAME=Goji-with-model.dmg bash make-dmg.sh
+  FULL_DMG="dist/Goji-with-model.dmg"
+else
+  echo "   (no local Parakeet v3 model, skipping Goji-with-model.dmg)"
+fi
 
 # --- push code (create the repo on first run) ---
 if git remote get-url origin >/dev/null 2>&1; then
@@ -56,10 +67,25 @@ git push origin "$TAG"
 # --- github release ---
 if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
   echo "==> Release $TAG exists, replacing the DMG"
-  gh release upload "$TAG" "$DMG" --repo "$REPO" --clobber
+  gh release upload "$TAG" "$DMG" $FULL_DMG --repo "$REPO" --clobber
 else
   echo "==> Creating release $TAG"
-  gh release create "$TAG" "$DMG" --repo "$REPO" --title "Goji ${VERSION}" --notes-file "$NOTES"
+  gh release create "$TAG" "$DMG" $FULL_DMG --repo "$REPO" --title "Goji ${VERSION}" --notes-file "$NOTES"
+fi
+
+# --- homebrew tap (brew install --cask brendanrong/goji/goji) ---
+# The tap is a separate repo cloned next to this one. Skipped if absent.
+TAP_DIR="${TAP_DIR:-$HOME/Developer/homebrew-goji}"
+if [[ -d "$TAP_DIR/.git" ]]; then
+  echo "==> Updating Homebrew cask in $TAP_DIR"
+  SHA=$(shasum -a 256 "$DMG" | awk '{print $1}')
+  mkdir -p "$TAP_DIR/Casks"
+  sed -e "s/__VERSION__/${VERSION}/" -e "s/__SHA256__/${SHA}/" homebrew/goji.rb.template > "$TAP_DIR/Casks/goji.rb"
+  git -C "$TAP_DIR" add Casks/goji.rb
+  git -C "$TAP_DIR" -c user.email=brendanrong22@gmail.com -c user.name=brendanrong commit -q -m "goji ${VERSION}" || true
+  git -C "$TAP_DIR" push origin HEAD
+else
+  echo "   (no tap at $TAP_DIR; create github.com/brendanrong/homebrew-goji and clone it there to publish the cask)"
 fi
 
 # --- enable GitHub Pages on /docs (first run; harmless if already on) ---
@@ -73,3 +99,4 @@ echo "Done."
 echo "  Release:  https://github.com/${REPO}/releases/tag/${TAG}"
 echo "  Site:     ${PAGES_URL}  (Pages takes 30-60s to deploy)"
 echo "  Download: https://github.com/${REPO}/releases/latest/download/Goji.dmg"
+echo "  Homebrew: brew install --cask brendanrong/goji/goji"
