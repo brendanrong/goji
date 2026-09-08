@@ -252,12 +252,16 @@ final class SettingsStore: ObservableObject {
     @Published var numbersAsDigits: Bool {
         didSet { defaults.set(numbersAsDigits, forKey: Keys.numbersAsDigits) }
     }
+    @Published var spokenPunctuation: Bool {
+        didSet { defaults.set(spokenPunctuation, forKey: Keys.spokenPunctuation) }
+    }
     var formatterOptions: TranscriptFormatter.Options {
         TranscriptFormatter.Options(
             spokenCommands: spokenCommands,
             removeFillers: removeFillers,
             collapseStutters: collapseStutters,
-            numbersAsDigits: numbersAsDigits
+            numbersAsDigits: numbersAsDigits,
+            spokenPunctuation: spokenPunctuation
         )
     }
     /// Ask GitHub once a day whether a newer release exists.
@@ -340,6 +344,7 @@ final class SettingsStore: ObservableObject {
         static let removeFillers = "removeFillers"
         static let collapseStutters = "collapseStutters"
         static let numbersAsDigits = "numbersAsDigits"
+        static let spokenPunctuation = "spokenPunctuation"
         static let autoCheckUpdates = "autoCheckUpdates"
     }
 
@@ -378,6 +383,7 @@ final class SettingsStore: ObservableObject {
         removeFillers = (d.object(forKey: Keys.removeFillers) as? Bool) ?? true
         collapseStutters = (d.object(forKey: Keys.collapseStutters) as? Bool) ?? true
         numbersAsDigits = (d.object(forKey: Keys.numbersAsDigits) as? Bool) ?? true
+        spokenPunctuation = (d.object(forKey: Keys.spokenPunctuation) as? Bool) ?? true
         autoCheckUpdates = (d.object(forKey: Keys.autoCheckUpdates) as? Bool) ?? true
         if let data = d.data(forKey: Keys.replacements),
            let rules = try? JSONDecoder().decode([ReplacementRule].self, from: data) {

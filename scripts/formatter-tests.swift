@@ -4,10 +4,11 @@
 import Foundation
 
 let all = TranscriptFormatter.Options.all
-let commandsOnly = TranscriptFormatter.Options(spokenCommands: true, removeFillers: false, collapseStutters: false, numbersAsDigits: false)
-let fillersOnly = TranscriptFormatter.Options(spokenCommands: false, removeFillers: true, collapseStutters: false, numbersAsDigits: false)
-let stuttersOnly = TranscriptFormatter.Options(spokenCommands: false, removeFillers: false, collapseStutters: true, numbersAsDigits: false)
-let numbersOnly = TranscriptFormatter.Options(spokenCommands: false, removeFillers: false, collapseStutters: false, numbersAsDigits: true)
+let commandsOnly = TranscriptFormatter.Options(spokenCommands: true, removeFillers: false, collapseStutters: false, numbersAsDigits: false, spokenPunctuation: false)
+let fillersOnly = TranscriptFormatter.Options(spokenCommands: false, removeFillers: true, collapseStutters: false, numbersAsDigits: false, spokenPunctuation: false)
+let stuttersOnly = TranscriptFormatter.Options(spokenCommands: false, removeFillers: false, collapseStutters: true, numbersAsDigits: false, spokenPunctuation: false)
+let numbersOnly = TranscriptFormatter.Options(spokenCommands: false, removeFillers: false, collapseStutters: false, numbersAsDigits: true, spokenPunctuation: false)
+let punctOnly = TranscriptFormatter.Options(spokenCommands: false, removeFillers: false, collapseStutters: false, numbersAsDigits: false, spokenPunctuation: true)
 
 struct Case {
     let input: String
@@ -84,6 +85,24 @@ let cases: [Case] = [
     Case("Eight kilos, five percent, three pm.", "8 kilos, 5 percent, 3 pm.", numbersOnly),
     Case("I have two dogs and one cat.", "I have two dogs and one cat.", numbersOnly),
     Case("I mean, three of them.", "I mean, three of them.", numbersOnly),
+
+    // Spoken punctuation
+    Case("Hi team comma the plan is ready full stop", "Hi team, the plan is ready.", punctOnly),
+    Case("Hi team comma, the plan is ready. Full stop.", "Hi team, the plan is ready.", punctOnly),
+    Case("Is it ready question mark", "Is it ready?", punctOnly),
+    Case("Ship it exclamation mark", "Ship it!", punctOnly),
+    Case("Wait period we ship Monday", "Wait. We ship Monday", punctOnly),
+    Case("The period was long.", "The period was long.", punctOnly),
+    Case("The comma is misplaced.", "The comma is misplaced.", punctOnly),
+    Case("Two things colon speed and trust", "Two things: speed and trust", punctOnly),
+    Case("She said open quote we ship Monday close quote and left.", "She said \"we ship Monday\" and left.", punctOnly),
+    Case("Add this open quotation the cat and the hat end quotation and then done", "Add this \"the cat and the hat\" and then done", punctOnly),
+    Case("Note open bracket see above close bracket for details", "Note (see above) for details", punctOnly),
+    Case("Email me at brendan at sign example dot com", "Email me at brendan@example dot com", punctOnly),
+    Case("Wait dot dot dot what", "Wait\u{2026} what", punctOnly),
+    Case("Questions ampersand answers", "Questions & answers", punctOnly),
+    Case("Slack dash it's fine", "Slack - it's fine", punctOnly),
+    Case("The first quote was better.", "The first quote was better.", punctOnly),
 
     // Everything together (the plan's done-when case)
     Case("um so the the plan is new paragraph we ship scratch that we test first",

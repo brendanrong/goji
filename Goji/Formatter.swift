@@ -17,9 +17,11 @@ enum TranscriptFormatter {
         /// "eighty kilos" -> "80 kilos", "five point one" -> "5.1", "fifteenth" -> "15th".
         /// One to nine stay as words. Parakeet is inconsistent about this on its own.
         var numbersAsDigits = true
+        /// "comma", "full stop", "question mark", "open quote" ... become the marks.
+        var spokenPunctuation = true
 
         static let all = Options()
-        static let none = Options(spokenCommands: false, removeFillers: false, collapseStutters: false, numbersAsDigits: false)
+        static let none = Options(spokenCommands: false, removeFillers: false, collapseStutters: false, numbersAsDigits: false, spokenPunctuation: false)
     }
 
     static func format(_ text: String, options: Options = .all) -> String {
@@ -27,6 +29,7 @@ enum TranscriptFormatter {
         if options.removeFillers { s = removeFillers(s) }
         if options.collapseStutters { s = collapseStutters(s) }
         if options.numbersAsDigits { s = NumberWords.normalize(s) }
+        if options.spokenPunctuation { s = applySpokenPunctuation(s) }
         if options.spokenCommands {
             // Breaks first so "scratch that" stops at a fresh paragraph.
             s = applyLineBreaks(s)
@@ -131,9 +134,82 @@ enum TranscriptFormatter {
         return out
     }
 
+    // MARK: Spoken punctuation
+
+    /// Placeholder quote/bracket marks so tidy can tell openers from closers;
+    /// they become straight characters at the very end.
+    private static let openQuote = "\u{201C}"
+    private static let closeQuote = "\u{201D}"
+
+    /// A determiner in front ("the comma", "my period", "this quote") means the
+    /// word is a noun, not a command.
+    private static let notAfterDeterminer = #"(?<!\b(?:the|a|an|this|that|my|your|his|her|its|our|their|each|every|of|first|second|last|next|one)\s)"#
+
+    private enum Attach { case left, right, none }
+
+    private struct Mark {
+        let phrase: String
+        let output: String
+        /// left: sticks to the word before (",", ")") and absorbs punctuation
+        /// Parakeet already put next to the spoken word. right: sticks to the
+        /// word after ("(", "#"). none: keeps the spaces around it ("&", "-").
+        let attach: Attach
+    }
+
+    private static let marks: [Mark] = [
+        Mark(phrase: "full stop", output: ".", attach: .left),
+        Mark(phrase: "period", output: ".", attach: .left),
+        Mark(phrase: "comma", output: ",", attach: .left),
+        Mark(phrase: "question mark", output: "?", attach: .left),
+        Mark(phrase: "exclamation (?:mark|point)", output: "!", attach: .left),
+        Mark(phrase: "semicolon", output: ";", attach: .left),
+        Mark(phrase: "colon", output: ":", attach: .left),
+        Mark(phrase: "(?:ellipsis|dot dot dot)", output: "\u{2026}", attach: .left),
+        Mark(phrase: "(?:close|end) (?:quote|quotation)(?: marks?)?", output: closeQuote, attach: .left),
+        Mark(phrase: "unquote", output: closeQuote, attach: .left),
+        Mark(phrase: "(?:open|begin|start) (?:quote|quotation)(?: marks?)?", output: openQuote, attach: .right),
+        Mark(phrase: "(?:close|end) (?:bracket|paren|parenthesis|parentheses)", output: ")", attach: .left),
+        Mark(phrase: "open (?:bracket|paren|parenthesis|parentheses)", output: "(", attach: .right),
+        Mark(phrase: "at sign", output: "@", attach: .left),
+        Mark(phrase: "hashtag", output: "#", attach: .right),
+        Mark(phrase: "ampersand", output: "&", attach: .none),
+        Mark(phrase: "(?:forward )?slash", output: "/", attach: .left),
+        Mark(phrase: "hyphen", output: "-", attach: .left),
+        Mark(phrase: "dash", output: "-", attach: .none),
+    ]
+
+    private static let markRegexes: [(NSRegularExpression, Mark)] = marks.map { mark in
+        // Optional punctuation on either side: Parakeet often writes "comma," or ". Full stop."
+        // The determiner guard only applies to marks that read as nouns
+        // ("the comma", "my period"); "this open quote" is a command.
+        let pattern: String
+        switch mark.attach {
+        case .left:
+            pattern = #"[,.!?;:]?\s*(?<![\w'])"# + notAfterDeterminer + mark.phrase + #"(?![\w'])[,.!?;:]?"#
+        case .right:
+            pattern = #"(?<![\w'])"# + mark.phrase + #"(?![\w'])[,.!?;:]?\s*"#
+        case .none:
+            pattern = #"(?<![\w'])"# + notAfterDeterminer + mark.phrase + #"(?![\w'])"#
+        }
+        return (regex(pattern), mark)
+    }
+
+    private static func applySpokenPunctuation(_ text: String) -> String {
+        var s = text
+        for (re, mark) in markRegexes {
+            s = re.stringByReplacingMatches(in: s, range: full(s), withTemplate: NSRegularExpression.escapedTemplate(for: mark.output))
+        }
+        return s
+    }
+
     // MARK: Tidy
 
-    private static let spaceBeforePunct = regex(#"\s+([,.!?;:])"#)
+    // ICU wants \x{...} for code points inside these raw patterns.
+    private static let spaceBeforePunct = regex(#"\s+([,.!?;:\x{2026}\x{201D})@/])"#)
+    private static let spaceAfterOpener = regex(#"([\x{201C}(#@/])\s+"#)
+    private static let spaceBeforeOpener = regex(#"(\w)([\x{201C}(])"#)
+    private static let spaceAfterCloser = regex(#"([\x{201D})])(\w)"#)
+    private static let doubledMark = regex(#"([,.!?;:])\1+"#)
     private static let doubledPunct = regex(#"([,.!?;:])(?:\s*[,;:])+"#)
     private static let commaThenStop = regex(#",\s*([.!?])"#)
     private static let multiSpace = regex(#"[ \t]{2,}"#)
@@ -143,6 +219,10 @@ enum TranscriptFormatter {
     private static func tidy(_ text: String) -> String {
         var s = text
         s = spaceBeforePunct.stringByReplacingMatches(in: s, range: full(s), withTemplate: "$1")
+        s = spaceAfterOpener.stringByReplacingMatches(in: s, range: full(s), withTemplate: "$1")
+        s = spaceBeforeOpener.stringByReplacingMatches(in: s, range: full(s), withTemplate: "$1 $2")
+        s = spaceAfterCloser.stringByReplacingMatches(in: s, range: full(s), withTemplate: "$1 $2")
+        s = doubledMark.stringByReplacingMatches(in: s, range: full(s), withTemplate: "$1")
         s = doubledPunct.stringByReplacingMatches(in: s, range: full(s), withTemplate: "$1")
         s = commaThenStop.stringByReplacingMatches(in: s, range: full(s), withTemplate: "$1")
         s = multiSpace.stringByReplacingMatches(in: s, range: full(s), withTemplate: " ")
@@ -155,7 +235,10 @@ enum TranscriptFormatter {
             let range = match.range(at: 2)
             ns.replaceCharacters(in: range, with: ns.substring(with: range).uppercased())
         }
-        return ns as String
+        // Placeholder curly quotes become plain ones (safe in code and chat).
+        return (ns as String)
+            .replacingOccurrences(of: openQuote, with: "\"")
+            .replacingOccurrences(of: closeQuote, with: "\"")
     }
 
     // MARK: Helpers

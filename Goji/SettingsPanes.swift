@@ -277,6 +277,12 @@ struct TranscriptionPane: View {
                         .labelsHidden()
                 }
                 Divider()
+                SettingsRow("Spoken punctuation",
+                            subtitle: "Say \"comma\", \"full stop\", \"question mark\", \"open quote\" \"close quote\", \"open bracket\", \"at sign\", \"dash\". Nouns like \"the comma\" are left alone.") {
+                    Toggle("Spoken punctuation", isOn: $settings.spokenPunctuation)
+                        .labelsHidden()
+                }
+                Divider()
                 SettingsRow("Remove filler words",
                             subtitle: "Drops um, uh, erm, and a \"you know\" or \"like\" used as filler.") {
                     Toggle("Remove filler words", isOn: $settings.removeFillers)
