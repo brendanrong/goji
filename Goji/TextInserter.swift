@@ -15,12 +15,14 @@ final class TextInserter {
     private(set) var lastInserted: String?
     private(set) var lastTargetBundleID: String?
 
-    func insert(_ text: String) {
+    /// `verify` false skips the refused-paste check (a paste over a selection
+    /// changes the field length unpredictably).
+    func insert(_ text: String, verify: Bool = true) {
         lastInserted = text
         lastTargetBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
         let pasteboard = NSPasteboard.general
         let saved = snapshot(pasteboard)
-        let lengthBefore = focusedTextLength()
+        let lengthBefore = verify ? focusedTextLength() : nil
 
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
@@ -63,25 +65,44 @@ final class TextInserter {
         }
     }
 
-    /// Removes the last paste. Preferred path: confirm via Accessibility that
-    /// the text right before the caret is exactly what we pasted, select it,
-    /// and delete. Fallback: a single Cmd+Z, which most apps treat a paste as.
-    /// Returns false when there's nothing to undo or the user has moved to
-    /// another app.
+    /// Removes the last paste. Returns false when there's nothing to undo or
+    /// the user has moved to another app.
     func undoLast() -> Bool {
+        guard selectLastInsertion() else { return false }
+        lastInserted = nil
+        postKey(51, flags: [])  // Delete
+        return true
+    }
+
+    /// Swaps the last paste for `text` (the correction flow). Returns false if
+    /// the last paste couldn't be located.
+    func replaceLast(with text: String) -> Bool {
+        guard selectLastInsertion() else { return false }
+        // Pasting over a selection replaces it in every text field.
+        insert(text, verify: false)
+        return true
+    }
+
+    /// Highlights exactly what the last paste put down. Preferred: confirm via
+    /// Accessibility that the text right before the caret is ours, and select
+    /// it. Otherwise: Shift+Left once per character, which is exact as long as
+    /// the caret hasn't moved since the paste (it hasn't, right after a
+    /// dictation). Cmd+Z was tried and is not reliable: Electron editors don't
+    /// always treat a paste as one undo step.
+    private func selectLastInsertion() -> Bool {
         guard let text = lastInserted else { return false }
         guard NSWorkspace.shared.frontmostApplication?.bundleIdentifier == lastTargetBundleID else {
             Log.paste.notice("undo skipped: different app in front")
             return false
         }
-        lastInserted = nil
         if selectTrailingText(text) {
-            postKey(51, flags: [])  // Delete
-            Log.paste.notice("undo: selected \(text.count) chars via AX and deleted")
-        } else {
-            postKey(6, flags: .maskCommand)  // Z
-            Log.paste.notice("undo: fell back to Cmd+Z")
+            Log.paste.notice("selected last paste (\(text.count) chars) via AX")
+            return true
         }
+        for _ in 0..<text.count {
+            postKey(123, flags: .maskShift)  // Left arrow
+        }
+        Log.paste.notice("selected last paste (\(text.count) chars) via Shift+Left")
         return true
     }
 

@@ -139,7 +139,25 @@ let shapeCases: [(String, Ctx?, String)] = [
     ("Really", Ctx(before: "Is it", after: "?"), " really"),
 ]
 
+// Correction diff: (what Goji wrote, what you meant, expected rules).
+typealias Sug = CorrectionDiff.Suggestion
+let diffCases: [(String, String, [Sug])] = [
+    ("hey team, the pod for figma is ready", "hey team, the PRD for Figma is ready", [Sug(find: "pod", replace: "PRD"), Sug(find: "figma", replace: "Figma")]),
+    ("remove the capsule as well", "remove the caps lock as well", [Sug(find: "capsule", replace: "caps lock")]),
+    ("How does it respond so quickly?", "How does it respond so quick then?", [Sug(find: "quickly", replace: "quick then")]),
+    ("Same text.", "Same text.", []),
+    ("Short", "A completely different long sentence about other things", []),
+    ("I said pod.", "I said PRD.", [Sug(find: "pod", replace: "PRD")]),
+]
+
 var failures = 0
+for (original, corrected, expected) in diffCases {
+    let got = CorrectionDiff.suggestions(original: original, corrected: corrected)
+    if got != expected {
+        failures += 1
+        print("FAIL diff\n  in:  \(original.debugDescription) -> \(corrected.debugDescription)\n  exp: \(expected)\n  got: \(got)")
+    }
+}
 for (text, ctx, expected) in shapeCases {
     let got = InsertionShaper.shape(text, context: ctx, preserveCase: ["Figma"].filter { _ in false })
     if got != expected {
@@ -161,6 +179,6 @@ for c in cases {
         print("FAIL\n  in:  \(c.input.debugDescription)\n  exp: \(c.expected.debugDescription)\n  got: \(got.debugDescription)")
     }
 }
-let total = cases.count + lowercaseCases.count + shapeCases.count
+let total = cases.count + lowercaseCases.count + shapeCases.count + diffCases.count
 print(failures == 0 ? "OK, \(total) cases" : "\(failures) of \(total) failed")
 exit(Int32(failures))

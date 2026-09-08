@@ -41,6 +41,11 @@ struct MenuContent: View {
             }
             .disabled(history.items.isEmpty)
 
+            Button("Fix Last Dictation…") {
+                CorrectionWindow.shared.show(controller: controller)
+            }
+            .disabled(history.items.isEmpty)
+
             // Quick mic switcher. The device list is fetched fresh every time
             // the menu opens, so newly plugged-in mics show up immediately.
             Menu("Microphone: \(currentMicName)") {

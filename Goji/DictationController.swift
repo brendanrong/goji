@@ -196,6 +196,42 @@ final class DictationController {
         state.accessibilityGranted = Permissions.accessibilityGranted
     }
 
+    /// Fix Last Dictation saved: keep the rules, fix History, and swap the
+    /// pasted text if the target app is still in front.
+    func applyCorrection(of item: HistoryItem, corrected: String, rules: [CorrectionDiff.Suggestion]) {
+        let text = corrected.trimmingCharacters(in: .whitespacesAndNewlines)
+        for rule in rules where !settings.replacements.contains(where: { $0.find.lowercased() == rule.find.lowercased() }) {
+            settings.replacements.append(ReplacementRule(find: rule.find, replace: rule.replace))
+        }
+        Log.dictation.notice("correction saved: \(rules.count) new rules, text changed: \(item.text != text)")
+        guard item.text != text else { return }
+        history.update(item.id, text: text)
+        state.lastTranscript = text
+
+        // The correction window took focus. Wait for the target app to be
+        // back in front (up to ~1.5 s), then swap the pasted text. If the
+        // user moved on, the fixed text is in History for Paste Last.
+        let target = inserter.lastTargetBundleID
+        var attempts = 0
+        func attempt() {
+            attempts += 1
+            if NSWorkspace.shared.frontmostApplication?.bundleIdentifier == target {
+                // Keep the same leading/trailing spacing the original paste had.
+                let original = inserter.lastInserted ?? item.text
+                let leading = original.hasPrefix(" ") ? " " : ""
+                let trailing = original.hasSuffix(" ") ? " " : ""
+                if !inserter.replaceLast(with: leading + text + trailing) {
+                    fail("Fixed text saved to History", hint: "Use Paste Last Transcription to drop it in.")
+                }
+            } else if attempts < 6 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: attempt)
+            } else {
+                fail("Fixed text saved to History", hint: "Use Paste Last Transcription to drop it in.")
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: attempt)
+    }
+
     /// Takes back the last paste (menu action).
     func undoLastInsertion() {
         if !inserter.undoLast() {
