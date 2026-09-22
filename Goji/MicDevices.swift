@@ -40,6 +40,22 @@ enum MicDevices {
         }
     }
 
+    /// How the device is attached (kAudioDeviceTransportType*: built-in, USB,
+    /// Bluetooth, virtual...). nil when the device is gone or won't say.
+    static func transportType(uid: String) -> UInt32? {
+        guard let id = deviceID(forUID: uid) else { return nil }
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyTransportType,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        guard AudioObjectHasProperty(id, &address) else { return nil }
+        var transport: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        guard AudioObjectGetPropertyData(id, &address, 0, nil, &size, &transport) == noErr else { return nil }
+        return transport
+    }
+
     private static func allDeviceIDs() -> [AudioDeviceID] {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDevices,

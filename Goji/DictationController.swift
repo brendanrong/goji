@@ -15,7 +15,13 @@ final class DictationController {
     private let inserter = TextInserter()
     private let hud = HUDController()
 
-    /// Recordings shorter than this are treated as accidental taps and dropped.
+    /// A press (or toggle on/off) shorter than this is an accidental tap and
+    /// is dropped before transcription. Judged by hold time, not audio
+    /// length: Instant start prepends pre-roll, so even a brush of the key
+    /// would otherwise carry enough samples to transcribe.
+    private let minimumHold: TimeInterval = 0.3
+    /// Below this much audio there is nothing worth transcribing; with a real
+    /// hold it means the mic delivered nothing.
     private let minimumSamples = Int(0.3 * AudioRecorder.sampleRate)
     /// Audio kept after key-up so a clipped last syllable still lands.
     private let tailPadding: TimeInterval = 0.2
@@ -27,6 +33,10 @@ final class DictationController {
     private var pressStartedAt: Date?
     private var shortTapReleasedAt: Date?
     private var lockGraceWork: DispatchWorkItem?
+    /// How long the key was physically held (hold mode), for the tap gate.
+    private var lastPressDuration: TimeInterval?
+    /// The take that is finishing was a locked, hands-free one.
+    private var finishedLocked = false
 
     private var lockEnabled: Bool {
         settings.activationMode == .hold && settings.doubleTapLock
@@ -61,17 +71,36 @@ final class DictationController {
         recorder.onLevel = { [weak self] level in
             self?.hud.updateLevel(level)
         }
-        // Pre-build the capture session so the first key-down is fast, and
-        // rebuild whenever the mic setting changes.
-        recorder.prepare(deviceUID: settings.micDeviceUID)
+        // Pre-build the capture session so the first key-down is fast (or,
+        // with Instant start, keep it open), and rebuild whenever the mic or
+        // that setting changes.
+        prepareRecorder()
         settings.$micDeviceUID
             .dropFirst()
             .removeDuplicates()
-            .sink { [weak self] uid in
+            .sink { [weak self] _ in
                 guard let self, self.state.phase == .idle else { return }
-                self.recorder.prepare(deviceUID: uid)
+                self.prepareRecorder()
             }
             .store(in: &cancellables)
+        settings.$instantStart
+            .dropFirst()
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                guard let self, self.state.phase == .idle else { return }
+                self.prepareRecorder()
+            }
+            .store(in: &cancellables)
+        // Sleep stops a running capture session. Re-arm on wake so the first
+        // dictation of the day gets its pre-roll too (no-op when cold).
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, self.state.phase == .idle else { return }
+                self.prepareRecorder()
+            }
+        }
 
         // If the chosen model's files were removed outside the app, fall back.
         if !Transcriber.availableLocally(settings.selectedModel), settings.selectedModel != .standard {
@@ -106,6 +135,12 @@ final class DictationController {
             state.modelState = .needsDownload
             WelcomeWindow.shared.show(state: state, controller: self)
         }
+    }
+
+    /// Idle recorder state from the current settings: cold session, or the
+    /// open mic plus ring buffer when Instant start is on.
+    private func prepareRecorder() {
+        recorder.prepare(deviceUID: settings.micDeviceUID, instantStart: settings.instantStart)
     }
 
     private func switchModel(to model: SpeechModel) {
@@ -286,6 +321,7 @@ final class DictationController {
         guard state.phase == .recording else { return }
 
         let pressDuration = pressStartedAt.map { Date().timeIntervalSince($0) } ?? .infinity
+        lastPressDuration = pressDuration
         guard lockEnabled, pressDuration <= doubleTapWindow else {
             finishRecording()
             return
@@ -339,23 +375,31 @@ final class DictationController {
         }
         state.lastError = nil
         let pressedAt = Date()
+        // Is something playing? Decides both the media pause and whether the
+        // pre-roll is safe (audio from before the press predates any pause,
+        // so on speakers it would put the song in the transcript). When the
+        // open Instant-start mic IS the default output device (combined USB
+        // headsets), "running somewhere" is us, so assume silence.
+        let outputIsMic = recorder.idleCapturing
+            && recorder.deviceUID != nil && recorder.deviceUID == SystemAudio.defaultOutputUID()
+        let outputActive = outputIsMic ? false : SystemAudio.outputIsActive()
         do {
-            try recorder.start(deviceUID: settings.micDeviceUID)
-            Log.dictation.notice("recording started, capture up in \(Log.ms(since: pressedAt)) ms")
+            try recorder.start(deviceUID: settings.micDeviceUID, includePreRoll: !outputActive)
+            Log.dictation.notice("recording started, capture up in \(Log.ms(since: pressedAt)) ms, pre-roll \(self.recorder.lastPreRollSamples * 1000 / Int(AudioRecorder.sampleRate)) ms")
             switch settings.whileDictating {
             case .nothing:
                 break
             case .quieter:
                 // Duck where the output has a volume control; otherwise fall
                 // back to pausing so the setting still does something useful.
-                if !SystemAudio.duckOutput(), SystemAudio.outputIsActive() {
+                if !SystemAudio.duckOutput(), outputActive {
                     MediaKeys.playPause()
                     pausedMedia = true
                 }
             case .pause:
                 // Only when audio is actually flowing: play/pause is a toggle
                 // and would otherwise START playback.
-                if SystemAudio.outputIsActive() {
+                if outputActive {
                     MediaKeys.playPause()
                     pausedMedia = true
                 }
@@ -375,6 +419,7 @@ final class DictationController {
 
     private func finishRecording() {
         guard state.phase == .recording else { return }
+        finishedLocked = locked
         resetLockState()
         escape.disarm()
         // People release the key on the last syllable ("three" came out as
@@ -393,11 +438,27 @@ final class DictationController {
         recordingStartedAt = nil
         SystemAudio.restoreOutput()
         resumeMediaIfPaused()
-        // Rebuild the idle session now so the next key-down only has to start it.
-        recorder.prepare(deviceUID: settings.micDeviceUID)
+        // Back to the idle state (cold session, or open mic feeding the ring).
+        prepareRecorder()
 
         let audioSeconds = Double(samples.count) / AudioRecorder.sampleRate
         Log.dictation.notice("recording stopped: held \(Int(held * 1000)) ms, audio \(String(format: "%.2f", audioSeconds), privacy: .public) s")
+
+        // Accidental tap? Hold mode judges the physical press (a locked take
+        // is always deliberate); toggle mode judges the gap between taps.
+        let intentional: Bool
+        switch settings.activationMode {
+        case .hold: intentional = finishedLocked || (lastPressDuration ?? held) >= minimumHold
+        case .toggle: intentional = held >= minimumHold
+        }
+        finishedLocked = false
+        lastPressDuration = nil
+        guard intentional else {
+            Log.dictation.notice("dropped as accidental tap (held \(Int(held * 1000)) ms)")
+            state.phase = .idle
+            hud.hide()
+            return
+        }
 
         guard samples.count >= minimumSamples else {
             // Held long enough to speak but the mic never produced a buffer:
@@ -405,7 +466,7 @@ final class DictationController {
             if held >= 0.5, recorder.deliveredNoAudio {
                 fail("No audio from \(recorder.deviceName)", hint: "Reconnect it, or switch mic:", offerMicPicker: true)
             } else {
-                Log.dictation.notice("dropped as accidental tap")
+                Log.dictation.notice("dropped: too little audio")
             }
             state.phase = .idle
             hud.hide()
@@ -500,10 +561,12 @@ final class DictationController {
     private func cancelRecording() {
         guard state.phase == .recording else { return }
         resetLockState()
+        finishedLocked = false
+        lastPressDuration = nil
         escape.disarm()
         _ = recorder.stop()
         recordingStartedAt = nil
-        recorder.prepare(deviceUID: settings.micDeviceUID)
+        prepareRecorder()
         Log.dictation.notice("recording cancelled (Esc)")
         SystemAudio.restoreOutput()
         resumeMediaIfPaused()

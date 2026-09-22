@@ -284,6 +284,12 @@ final class SettingsStore: ObservableObject {
             }
         }
     }
+    /// Keep the mic open between dictations and prepend the last ~450 ms to
+    /// each take, so the first word survives a press-and-speak. Off by
+    /// default: macOS shows the recording indicator the whole time.
+    @Published var instantStart: Bool {
+        didSet { defaults.set(instantStart, forKey: Keys.instantStart) }
+    }
     @Published var replacements: [ReplacementRule] {
         didSet { persistReplacements() }
     }
@@ -330,6 +336,7 @@ final class SettingsStore: ObservableObject {
         static let showInMenuBar = "showInMenuBar"
         static let showInDock = "showInDock"
         static let micDeviceUID = "micDeviceUID"
+        static let instantStart = "instantStart"
         static let playSounds = "playSounds"
         static let doubleTapLock = "doubleTapLock"
         static let whileDictating = "whileDictating"
@@ -364,6 +371,7 @@ final class SettingsStore: ObservableObject {
         showInMenuBar = (d.object(forKey: Keys.showInMenuBar) as? Bool) ?? true
         showInDock = (d.object(forKey: Keys.showInDock) as? Bool) ?? true
         micDeviceUID = d.string(forKey: Keys.micDeviceUID)
+        instantStart = d.bool(forKey: Keys.instantStart)
         playSounds = (d.object(forKey: Keys.playSounds) as? Bool) ?? true
         doubleTapLock = (d.object(forKey: Keys.doubleTapLock) as? Bool) ?? true
         if let raw = d.string(forKey: Keys.whileDictating), let mode = WhileDictating(rawValue: raw) {

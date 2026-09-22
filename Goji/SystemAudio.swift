@@ -57,6 +57,26 @@ enum SystemAudio {
         return running != 0
     }
 
+    /// UID of the default output device. Lets the caller tell whether the
+    /// output is the same physical device as the mic (combined USB headsets),
+    /// in which case an idle-capturing mic makes the device "running" and
+    /// `outputIsActive()` can no longer tell whether media is playing.
+    static func defaultOutputUID() -> String? {
+        guard let device = defaultOutputDevice() else { return nil }
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceUID,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var size = UInt32(MemoryLayout<CFString?>.size)
+        var value: CFString?
+        let status = withUnsafeMutablePointer(to: &value) { pointer in
+            AudioObjectGetPropertyData(device, &address, 0, nil, &size, pointer)
+        }
+        guard status == noErr, let value else { return nil }
+        return value as String
+    }
+
     // MARK: - CoreAudio plumbing
 
     private static func defaultOutputDevice() -> AudioDeviceID? {

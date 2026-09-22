@@ -209,6 +209,12 @@ struct MicrophoneSection: View {
                     }
                 }
             }
+            Divider()
+            SettingsRow("Instant start",
+                        subtitle: "Keeps the mic open between dictations and adds the half second before you pressed, so the first word is never clipped. macOS shows the recording indicator the whole time. Skipped for Bluetooth mics.") {
+                Toggle("Instant start", isOn: $settings.instantStart)
+                    .labelsHidden()
+            }
         }
         .onAppear { devices = MicDevices.inputDevices() }
         .onDisappear { micPreview.stop() }
