@@ -25,6 +25,10 @@ final class DictationController {
     private let minimumSamples = Int(0.3 * AudioRecorder.sampleRate)
     /// Audio kept after key-up so a clipped last syllable still lands.
     private let tailPadding: TimeInterval = 0.2
+    /// AI cleanup is skipped at or below this many words: the deterministic
+    /// pass and Word replacements already cover "yes" and "on it", and the
+    /// Foundation Models round trip would be most of the latency.
+    private let maxWordsWithoutCleanup = 3
 
     // Double-tap lock (hold mode): a quick tap-tap locks recording hands-free,
     // the next tap finishes it. State below tracks the tap timing.
@@ -505,9 +509,14 @@ final class DictationController {
                     Log.dictation.notice("app profile: \(profile.name, privacy: .public)")
                 }
                 if settings.cleanupEnabled, profile?.aiCleanup ?? true {
-                    let cleanupStart = Date()
-                    cleaned = await Cleaner.cleanup(cleaned, vocabulary: settings.vocabularyTerms)
-                    Log.dictation.notice("AI cleanup in \(Log.ms(since: cleanupStart)) ms")
+                    let wordCount = cleaned.split(whereSeparator: \.isWhitespace).count
+                    if wordCount <= maxWordsWithoutCleanup {
+                        Log.dictation.notice("AI cleanup skipped: \(wordCount) words")
+                    } else {
+                        let cleanupStart = Date()
+                        cleaned = await Cleaner.cleanup(cleaned, vocabulary: settings.vocabularyTerms)
+                        Log.dictation.notice("AI cleanup in \(Log.ms(since: cleanupStart)) ms")
+                    }
                 }
                 cleaned = settings.applyReplacements(to: cleaned)
                 let dropFullStop: Bool
