@@ -39,7 +39,7 @@ actor Transcriber {
     }
 
     /// Loads the requested model, replacing whatever was loaded before.
-    func prepare(model: SpeechModel = .standard, progressHandler: DownloadUtils.ProgressHandler? = nil) async throws {
+    func prepare(model: SpeechModel = .standard, progressHandler: ProgressHandler? = nil) async throws {
         guard loadedModel != model else { return }
 
         switch model {
@@ -62,7 +62,7 @@ actor Transcriber {
     /// distribution: no download on first run), then the cache, then the
     /// HuggingFace download path.
     private static func loadParakeet(
-        version: AsrModelVersion, progressHandler: DownloadUtils.ProgressHandler?
+        version: AsrModelVersion, progressHandler: ProgressHandler?
     ) async throws -> AsrModels {
         if version == .v3, let bundled = bundledModelURL,
             FileManager.default.fileExists(atPath: bundled.path) {

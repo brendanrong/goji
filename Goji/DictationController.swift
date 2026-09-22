@@ -45,6 +45,11 @@ final class DictationController {
     }
 
     func start() {
+        // FluidAudio may not touch the network unless Goji says so. Loading a
+        // complete cache or the bundled model needs nothing; a corrupt cache
+        // now fails loudly instead of silently re-downloading. The two
+        // intentional download paths (first run, Models pane) lift this.
+        ModelHub.offlineMode = true
         Permissions.requestMicrophone()
 
         hotkey.onHotkeyDown = { [weak self] in self?.hotkeyDown() }
@@ -170,6 +175,8 @@ final class DictationController {
     /// FluidAudio's own downloader: sequential, file by file, slower, but it
     /// works even if the GitHub model release is missing.
     private func prepareViaHuggingFace() async throws {
+        ModelHub.offlineMode = false
+        defer { ModelHub.offlineMode = true }
         try await transcriber.prepare { progress in
             let label: String
             switch progress.phase {

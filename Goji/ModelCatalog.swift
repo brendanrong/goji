@@ -83,8 +83,8 @@ enum SpeechModel: String, CaseIterable, Identifiable {
 }
 
 /// Download/remove/measure state for the Models pane. Downloads go through
-/// FluidAudio's HuggingFace path; the default model's first-run download still
-/// uses the faster GitHub mirror via ModelFetcher.
+/// FluidAudio's HuggingFace path (ModelHub, 0.15.5+); the default model's
+/// first-run download still uses the faster GitHub mirror via ModelFetcher.
 @MainActor
 final class ModelLibrary: ObservableObject {
     static let shared = ModelLibrary()
@@ -100,8 +100,12 @@ final class ModelLibrary: ObservableObject {
         lastError = nil
         downloading[model] = (0, "Starting…")
         Task {
+            // The one place besides first run where Goji may touch the
+            // network for a model: lift the offline lock for the download only.
+            ModelHub.offlineMode = false
+            defer { ModelHub.offlineMode = true }
             do {
-                try await DownloadUtils.downloadRepo(model.repo, to: SpeechModel.modelsRoot) { progress in
+                try await ModelHub.download(model.repo, to: SpeechModel.modelsRoot, progressHandler: { progress in
                     let label: String
                     switch progress.phase {
                     case .listing:
@@ -115,7 +119,7 @@ final class ModelLibrary: ObservableObject {
                     Task { @MainActor [weak self] in
                         self?.downloading[model] = (fraction, label)
                     }
-                }
+                })
             } catch {
                 lastError = "\(model.displayName): \(error.localizedDescription)"
             }
