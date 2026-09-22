@@ -24,6 +24,7 @@ From then on Goji updates itself: one click in the menu bar when a new version i
 
 - Hold Right Option, speak, release. Or pick another key, or record your own combo (Fn + Right Control if that's your thing).
 - Hold or Toggle mode. In Hold, double-tap locks recording hands-free. Esc cancels.
+- Talk the instant you press and the first word can get clipped. Turn on **Instant start** (Settings > General > Microphone) and Goji keeps the mic open between dictations and adds the half second before your press. macOS shows the recording indicator the whole time; it stays off for Bluetooth mics.
 - The listening indicator lives in the notch (or a bottom panel if you prefer, or on displays without a notch it draws its own).
 - Switch microphones straight from the menu bar.
 - While you dictate, Goji can duck your music to 20% or pause it entirely. Your call.
