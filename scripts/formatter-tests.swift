@@ -86,6 +86,15 @@ let cases: [Case] = [
     Case("I have two dogs and one cat.", "I have two dogs and one cat.", numbersOnly),
     Case("I mean, three of them.", "I mean, three of them.", numbersOnly),
 
+    // Digit runs (cards, phones, codes)
+    Case("My card is four one two three four five six seven", "My card is 41234567", numbersOnly),
+    Case("Code is four, one, two, three.", "Code is 4123.", numbersOnly),
+    Case("Call oh four one two double three triple five", "Call 041233555", numbersOnly),
+    Case("Ring zero four one two three four five six seven eight", "Ring 0412345678", numbersOnly),
+    Case("Oh, four one two three.", "Oh, 4123.", numbersOnly),
+    Case("Two three people came.", "Two three people came.", numbersOnly),
+    Case("The pin is 4 1 2 3.", "The pin is 4123.", numbersOnly),
+
     // Spoken punctuation
     Case("Hi team comma the plan is ready full stop", "Hi team, the plan is ready.", punctOnly),
     Case("Hi team comma, the plan is ready. Full stop.", "Hi team, the plan is ready.", punctOnly),

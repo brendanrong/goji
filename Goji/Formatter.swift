@@ -347,7 +347,47 @@ enum NumberWords {
 
     private static let letterNumber = try! NSRegularExpression(pattern: #"\b([QqVv]) (\d+)\b"#)
 
-    static func normalize(_ text: String) -> String {
+    // MARK: Digit runs
+
+    /// Four or more single digits in a row are a code, card or phone number:
+    /// "four one two three" -> "4123". Fewer stay words, so "two three people"
+    /// and "zero zero seven" are untouched. An "Oh," with a comma is a word.
+    private static let digitWord = #"(?:zero|oh|one|two|three|four|five|six|seven|eight|nine|\d)"#
+    private static let digitUnit = #"(?:(?:double|triple)\s+)?"# + digitWord
+    private static let digitRun = try! NSRegularExpression(
+        pattern: #"(?<![\w'])(?!oh,)"# + digitUnit + #"(?:(?:[,.]?\s+|-)"# + digitUnit + #"){3,}(?![\w'])"#,
+        options: [.caseInsensitive]
+    )
+    private static let digitToken = try! NSRegularExpression(pattern: #"[A-Za-z]+|\d"#)
+    private static let digitValues: [String: String] = [
+        "zero": "0", "oh": "0", "one": "1", "two": "2", "three": "3", "four": "4",
+        "five": "5", "six": "6", "seven": "7", "eight": "8", "nine": "9",
+    ]
+
+    private static func joinDigitRuns(_ text: String) -> String {
+        let ns = text as NSString
+        var out = ""
+        var cursor = 0
+        for match in digitRun.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
+            let run = ns.substring(with: match.range)
+            let rns = run as NSString
+            var digits = ""
+            var repeatCount = 1
+            for t in digitToken.matches(in: run, range: NSRange(location: 0, length: rns.length)) {
+                let w = rns.substring(with: t.range).lowercased()
+                if w == "double" { repeatCount = 2; continue }
+                if w == "triple" { repeatCount = 3; continue }
+                digits += String(repeating: digitValues[w] ?? w, count: repeatCount)
+                repeatCount = 1
+            }
+            out += ns.substring(with: NSRange(location: cursor, length: match.range.location - cursor)) + digits
+            cursor = match.range.location + match.range.length
+        }
+        return out + ns.substring(from: cursor)
+    }
+
+    static func normalize(_ input: String) -> String {
+        let text = joinDigitRuns(input)
         let ns = text as NSString
         let tokens = token.matches(in: text, range: NSRange(location: 0, length: ns.length)).map { ns.substring(with: $0.range) }
         var out = ""
