@@ -29,7 +29,10 @@ enum TranscriptFormatter {
         if options.removeFillers { s = removeFillers(s) }
         if options.collapseStutters { s = collapseStutters(s) }
         if options.numbersAsDigits { s = NumberWords.normalize(s) }
-        if options.spokenPunctuation { s = applySpokenPunctuation(s) }
+        if options.spokenPunctuation {
+            s = applyWebAddresses(s)
+            s = applySpokenPunctuation(s)
+        }
         if options.spokenCommands {
             // Breaks first so "scratch that" stops at a fresh paragraph.
             s = applyLineBreaks(s)
@@ -132,6 +135,63 @@ enum TranscriptFormatter {
         }
         out += ns.substring(from: cursor)
         return out
+    }
+
+    // MARK: Web addresses
+
+    /// "X dot Y" only becomes "X.Y" when it ends in one of these, so "polka dot
+    /// dress" and "dot dot dot" stay words.
+    private static let tlds = "com|net|org|io|ai|dev|app|new|co|au|uk|nz|us|ca|so|me|xyz|gg|tv|fm|sh|ly|to|edu|gov|info|biz|site|design|page|link"
+    /// Spoken "dot" plus whatever Parakeet wrapped it in: "bolt dot new",
+    /// "Bolt. Dot. New", "Bolt.dot.new".
+    private static let dotSep = #"\s*[.,]?\s*(?<![\w'])dot(?![\w'])\s*[.,]?\s*"#
+    private static let label = #"[A-Za-z0-9][A-Za-z0-9-]*"#
+    private static let dotSepRegex = regex(dotSep)
+    private static let address = regex(
+        #"(?<![\w'@.-])"# + label + #"(?:"# + dotSep + label + #")*"# + dotSep + #"(?:"# + tlds + #")(?![\w-])"#
+    )
+    /// "brendan at canva.com" -> "brendan@canva.com". Runs after `address`, so
+    /// the domain is already written. The local part may hold spoken dots too.
+    private static let email = regex(
+        #"(?<![\w'@.-])("# + label + #"(?:"# + dotSep + label + #")*)\s+at\s+((?:[a-z0-9-]+\.)+(?:"# + tlds + #"))(?![\w-])"#
+    )
+    /// Words that end "... at site.com" in normal speech: "sign up at", "find us
+    /// at", "I work at". These keep the "at".
+    private static let notEmailLocal: Set<String> = [
+        "up", "me", "us", "them", "him", "her", "it", "you", "out", "back", "in", "on", "here", "there",
+        "look", "home", "work", "works", "live", "find", "see", "meet", "stay", "be", "is", "are", "was",
+        "were", "now", "online", "available", "only", "just", "free", "today", "site", "page", "link", "app",
+    ]
+
+    private static func applyWebAddresses(_ text: String) -> String {
+        var s = replacing(address, in: text) { ns, match in
+            let raw = ns.substring(with: match.range)
+            return dotSepRegex.stringByReplacingMatches(in: raw, range: full(raw), withTemplate: ".").lowercased()
+        }
+        s = replacing(email, in: s) { ns, match in
+            let rawLocal = ns.substring(with: match.range(at: 1))
+            let local = dotSepRegex.stringByReplacingMatches(in: rawLocal, range: full(rawLocal), withTemplate: ".").lowercased()
+            let spokenDot = local != rawLocal.lowercased()
+            if !spokenDot, notEmailLocal.contains(local) || local.hasSuffix("ed") || local.hasSuffix("ing") {
+                return nil
+            }
+            return local + "@" + ns.substring(with: match.range(at: 2)).lowercased()
+        }
+        return s
+    }
+
+    /// Replace each match with `transform`'s result; nil leaves the match as is.
+    private static func replacing(_ re: NSRegularExpression, in text: String, _ transform: (NSString, NSTextCheckingResult) -> String?) -> String {
+        let ns = text as NSString
+        var out = ""
+        var cursor = 0
+        for match in re.matches(in: text, range: full(text)) {
+            guard let replacement = transform(ns, match) else { continue }
+            out += ns.substring(with: NSRange(location: cursor, length: match.range.location - cursor))
+            out += replacement
+            cursor = match.range.location + match.range.length
+        }
+        return out + ns.substring(from: cursor)
     }
 
     // MARK: Spoken punctuation
