@@ -163,6 +163,19 @@ let cases: [Case] = [
     Case("Slack dash it's fine", "Slack - it's fine", punctOnly),
     Case("The first quote was better.", "The first quote was better.", punctOnly),
 
+    // Dev symbols
+    Case("Name it my underscore file", "Name it my_file", punctOnly),
+    Case("Use snake underscore case underscore here", "Use snake_case_here", punctOnly),
+    Case("The underscore is fine", "The underscore is fine", punctOnly),
+    Case("Go to C colon backslash Users", "Go to C:\\Users", punctOnly),
+    Case("Two plus sign two equals sign four", "Two + two = four", punctOnly),
+    Case("Plus we need tests", "Plus we need tests", punctOnly),
+    Case("Run it with asterisk", "Run it with *", punctOnly),
+    Case("Open tilde slash code", "Open ~/code", punctOnly),
+    Case("Price is dollar sign five", "Price is $five", punctOnly),
+    Case("Pipe it with pipe symbol grep", "Pipe it with | grep", punctOnly),
+    Case("Call me pound sign one", "Call me #one", punctOnly),
+
     // Everything together (the plan's done-when case)
     Case("um so the the plan is new paragraph we ship scratch that we test first",
          "So the plan is\n\nWe test first"),

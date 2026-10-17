@@ -228,7 +228,8 @@ enum TranscriptFormatter {
     /// word is a noun, not a command.
     private static let notAfterDeterminer = #"(?<!\b(?:the|a|an|this|that|my|your|his|her|its|our|their|each|every|of|first|second|last|next|one)\s)"#
 
-    private enum Attach { case left, right, none }
+    /// both: glues the words on either side ("my_file", "C:\Users").
+    private enum Attach { case left, right, none, both }
 
     private struct Mark {
         let phrase: String
@@ -256,9 +257,21 @@ enum TranscriptFormatter {
         Mark(phrase: "at sign", output: "@", attach: .left),
         Mark(phrase: "hashtag", output: "#", attach: .right),
         Mark(phrase: "ampersand", output: "&", attach: .none),
+        Mark(phrase: "underscore", output: "_", attach: .both),
+        Mark(phrase: "back ?slash", output: "\\", attach: .both),
         Mark(phrase: "(?:forward )?slash", output: "/", attach: .left),
         Mark(phrase: "hyphen", output: "-", attach: .left),
         Mark(phrase: "dash", output: "-", attach: .none),
+        // Symbols that are also everyday words ("plus", "star", "pipe") need
+        // "sign"/"symbol" so normal speech is left alone.
+        Mark(phrase: "asterisk", output: "*", attach: .none),
+        Mark(phrase: "tilde", output: "~", attach: .right),
+        Mark(phrase: "plus sign", output: "+", attach: .none),
+        Mark(phrase: "equals? sign", output: "=", attach: .none),
+        Mark(phrase: "percent sign", output: "%", attach: .left),
+        Mark(phrase: "dollar sign", output: "$", attach: .right),
+        Mark(phrase: "(?:hash|pound) sign", output: "#", attach: .right),
+        Mark(phrase: "(?:pipe (?:symbol|character)|vertical bar)", output: "|", attach: .none),
     ]
 
     private static let markRegexes: [(NSRegularExpression, Mark)] = marks.map { mark in
@@ -273,6 +286,9 @@ enum TranscriptFormatter {
             pattern = #"(?<![\w'])"# + mark.phrase + #"(?![\w'])[,.!?;:]?\s*"#
         case .none:
             pattern = #"(?<![\w'])"# + notAfterDeterminer + mark.phrase + #"(?![\w'])"#
+        case .both:
+            // Narrower guard: "my underscore file" is a name (my_file), "the underscore" a noun.
+            pattern = #"[,.]?\s*(?<![\w'])(?<!\b(?:the|a|an|this|that)\s)"# + mark.phrase + #"(?![\w'])[,.]?\s*"#
         }
         return (regex(pattern), mark)
     }
