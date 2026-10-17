@@ -277,6 +277,7 @@ enum TranscriptFormatter {
     private static let commaThenStop = regex(#",\s*([.!?])"#)
     private static let multiSpace = regex(#"[ \t]{2,}"#)
     private static let spaceAroundBreak = regex(#"[ \t]*\n[ \t]*"#)
+    private static let addressStart = regex(#"[\w-]+(?:[.@][\w-]+)*\.(?:"# + tlds + #")(?![\w-])"#)
     private static let lowercaseSentenceStart = regex(#"(^|[.!?]\s+|\n)(\p{Ll})"#)
 
     private static func tidy(_ text: String) -> String {
@@ -296,6 +297,10 @@ enum TranscriptFormatter {
         let ns = NSMutableString(string: s)
         for match in lowercaseSentenceStart.matches(in: s, range: full(s)).reversed() {
             let range = match.range(at: 2)
+            // "bolt.new is great" and "brendan@canva.com" keep their lowercase.
+            if addressStart.firstMatch(in: s, options: .anchored, range: NSRange(location: range.location, length: ns.length - range.location)) != nil {
+                continue
+            }
             ns.replaceCharacters(in: range, with: ns.substring(with: range).uppercased())
         }
         // Placeholder curly quotes become plain ones (safe in code and chat).
