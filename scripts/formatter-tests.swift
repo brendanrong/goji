@@ -95,6 +95,21 @@ let cases: [Case] = [
     Case("Two three people came.", "Two three people came.", numbersOnly),
     Case("The pin is 4 1 2 3.", "The pin is 4123.", numbersOnly),
 
+    // Years and times
+    Case("Back in twenty twenty six", "Back in 2026"),
+    Case("Back in twenty twenty-five.", "Back in 2025."),
+    Case("Born in nineteen ninety nine", "Born in 1999"),
+    Case("Built in nineteen oh five", "Built in 1905"),
+    Case("Since twenty ten", "Since 2010"),
+    Case("Meet at three thirty pm", "Meet at 3:30 pm"),
+    Case("Meet at three thirty", "Meet at 3:30"),
+    Case("From ten fifteen to eleven forty five", "From 10:15 to 11:45"),
+    Case("Wake at six oh five am", "Wake at 6:05 am"),
+    Case("It was twenty thirty minutes", "It was 20 30 minutes", numbersOnly),
+    Case("It costs three fifty dollars", "It costs three 50 dollars", numbersOnly),
+    Case("Thirty three people", "33 people", numbersOnly),
+    Case("One hundred and twenty three", "123", numbersOnly),
+
     // Spoken punctuation
     Case("Hi team comma the plan is ready full stop", "Hi team, the plan is ready.", punctOnly),
     Case("Hi team comma, the plan is ready. Full stop.", "Hi team, the plan is ready.", punctOnly),

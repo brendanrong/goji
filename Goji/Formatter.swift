@@ -62,6 +62,9 @@ enum TranscriptFormatter {
         "had", "that", "very", "no", "so", "really", "bye", "ha", "is", "yeah",
         // Numbers are read out digit by digit: "double oh seven", "one one".
         "zero", "oh", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+        // Years and times repeat on purpose: "twenty twenty", "ten ten".
+        "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen",
+        "eighteen", "nineteen", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety",
     ]
     private static let repeatedWord = regex(#"(?<![\w'])([\w']+)(?:,?\s+)\1(?![\w'])"#)
 
@@ -386,8 +389,70 @@ enum NumberWords {
         return out + ns.substring(from: cursor)
     }
 
+    // MARK: Years and times
+
+    private static let unitWord = "one|two|three|four|five|six|seven|eight|nine"
+    private static let teenWord = "ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen"
+    private static let tensWord = "twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety"
+    private static let sep = #"[\s-]+"#
+    /// Second half of a year or the minutes of a time: "oh five", "fifteen", "thirty two".
+    private static func pair(tens: String) -> String {
+        #"(?:oh"# + sep + "(?:" + unitWord + ")|(?:" + teenWord + ")|(?:" + tens + ")(?:" + sep + "(?:" + unitWord + "))?)"
+    }
+    /// "twenty twenty six" -> "2026", "nineteen oh five" -> "1905".
+    private static let year = try! NSRegularExpression(
+        pattern: #"(?<![\w'])(eighteen|nineteen|twenty)"# + sep + "(" + pair(tens: tensWord) + #")(?![\w'-])"#,
+        options: [.caseInsensitive]
+    )
+    /// "three thirty" -> "3:30", "ten oh five" -> "10:05".
+    private static let time = try! NSRegularExpression(
+        pattern: #"(?<![\w'])(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)"# + sep + "(" + pair(tens: "twenty|thirty|forty|fifty") + #")(?![\w'-])"#,
+        options: [.caseInsensitive]
+    )
+    private static let nextWord = try! NSRegularExpression(pattern: #"^[\s-]+([A-Za-z]+)"#)
+
+    /// Value of a short run of number words ("oh five", "thirty two", "fifteen").
+    private static func smallValue(_ words: String) -> Int {
+        words.lowercased().split(whereSeparator: { $0 == " " || $0 == "-" }).reduce(0) { sum, w in
+            sum + (units[String(w)] ?? tens[String(w)] ?? 0)
+        }
+    }
+
+    /// Years and clock times. Skipped when a unit follows ("twenty thirty
+    /// minutes", "three fifty dollars"): those are amounts, not dates or times.
+    private static func joinYearsAndTimes(_ text: String) -> String {
+        var s = replaceMatches(year, in: text) { ns, m in
+            let century = smallValue(ns.substring(with: m.range(at: 1)))
+            return String(century * 100 + smallValue(ns.substring(with: m.range(at: 2))))
+        }
+        s = replaceMatches(time, in: s) { ns, m in
+            let hour = smallValue(ns.substring(with: m.range(at: 1)))
+            let minutes = smallValue(ns.substring(with: m.range(at: 2)))
+            return "\(hour):" + (minutes < 10 ? "0" : "") + String(minutes)
+        }
+        return s
+    }
+
+    private static func replaceMatches(_ re: NSRegularExpression, in text: String, _ transform: (NSString, NSTextCheckingResult) -> String) -> String {
+        let ns = text as NSString
+        var out = ""
+        var cursor = 0
+        for m in re.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
+            let end = m.range.location + m.range.length
+            let rest = ns.substring(from: end)
+            if let next = nextWord.firstMatch(in: rest, range: NSRange(location: 0, length: (rest as NSString).length)),
+               unitsAfter.contains((rest as NSString).substring(with: next.range(at: 1)).lowercased()),
+               !["am", "pm"].contains((rest as NSString).substring(with: next.range(at: 1)).lowercased()) {
+                continue
+            }
+            out += ns.substring(with: NSRange(location: cursor, length: m.range.location - cursor)) + transform(ns, m)
+            cursor = end
+        }
+        return out + ns.substring(from: cursor)
+    }
+
     static func normalize(_ input: String) -> String {
-        let text = joinDigitRuns(input)
+        let text = joinDigitRuns(joinYearsAndTimes(input))
         let ns = text as NSString
         let tokens = token.matches(in: text, range: NSRange(location: 0, length: ns.length)).map { ns.substring(with: $0.range) }
         var out = ""
@@ -459,7 +524,8 @@ enum NumberWords {
                 if current % 10 != 0 || (current >= 10 && current < 20) { break }
                 current += n
             } else if let n = tens[w] {
-                if current % 100 >= 10 { break }
+                // "thirty three" is 33, "three thirty" is not (a time, or two numbers).
+                if current % 100 != 0 { break }
                 current += n
             } else if let n = scales[w] {
                 // A bare "million" (or "3.5 million" after a decimal) stays a word.
