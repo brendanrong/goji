@@ -287,8 +287,9 @@ final class DictationController {
 
     /// Re-inserts the most recent transcript at the cursor.
     func insertLast() {
-        guard let last = history.last else { return }
-        inserter.insert(last.text + " ")
+        // Prefer this session's unmasked text: History masks card numbers.
+        guard let last = state.lastTranscript ?? history.last?.text else { return }
+        inserter.insert(last + " ")
     }
 
     private func hotkeyDown() {

@@ -190,7 +190,22 @@ let diffCases: [(String, String, [Sug])] = [
     ("I said pod.", "I said PRD.", [Sug(find: "pod", replace: "PRD")]),
 ]
 
+// Card numbers never reach History on disk.
+let maskCases: [(String, String)] = [
+    ("My card is 4123456789012345", "My card is •••• 2345"),
+    ("Card 4123 4567 8901 2345 exp 0428", "Card •••• 2345 exp 0428"),
+    ("Call 0412345678", "Call 0412345678"),
+    ("Back in 2026", "Back in 2026"),
+]
+
 var failures = 0
+for (input, expected) in maskCases {
+    let got = CardMask.mask(input)
+    if got != expected {
+        failures += 1
+        print("FAIL mask\n  in:  \(input.debugDescription)\n  exp: \(expected.debugDescription)\n  got: \(got.debugDescription)")
+    }
+}
 for (original, corrected, expected) in diffCases {
     let got = CorrectionDiff.suggestions(original: original, corrected: corrected)
     if got != expected {
@@ -219,6 +234,6 @@ for c in cases {
         print("FAIL\n  in:  \(c.input.debugDescription)\n  exp: \(c.expected.debugDescription)\n  got: \(got.debugDescription)")
     }
 }
-let total = cases.count + lowercaseCases.count + shapeCases.count + diffCases.count
+let total = maskCases.count + cases.count + lowercaseCases.count + shapeCases.count + diffCases.count
 print(failures == 0 ? "OK, \(total) cases" : "\(failures) of \(total) failed")
 exit(Int32(failures))

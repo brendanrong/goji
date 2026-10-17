@@ -6,6 +6,25 @@ struct HistoryItem: Codable, Identifiable, Equatable {
     var date = Date()
 }
 
+/// Card-length digit runs (13 to 19 digits, spaces or dashes allowed between
+/// groups) never reach History on disk: "4123 4567 8901 2345" is stored as
+/// "•••• 2345". Paste Last still has the full text for this session.
+enum CardMask {
+    private static let run = try! NSRegularExpression(pattern: #"(?<!\d)\d(?:[ -]?\d){12,18}(?!\d)"#)
+
+    static func mask(_ text: String) -> String {
+        let ns = text as NSString
+        var out = ""
+        var cursor = 0
+        for m in run.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
+            let digits = ns.substring(with: m.range).filter(\.isNumber)
+            out += ns.substring(with: NSRange(location: cursor, length: m.range.location - cursor)) + "•••• " + digits.suffix(4)
+            cursor = m.range.location + m.range.length
+        }
+        return out + ns.substring(from: cursor)
+    }
+}
+
 /// Recent transcripts, newest first. Stored locally in UserDefaults, capped.
 @MainActor
 final class HistoryStore: ObservableObject {
@@ -29,7 +48,7 @@ final class HistoryStore: ObservableObject {
     var last: HistoryItem? { items.first }
 
     func add(_ text: String) {
-        items.insert(HistoryItem(text: text), at: 0)
+        items.insert(HistoryItem(text: CardMask.mask(text)), at: 0)
         if items.count > Self.cap {
             items.removeLast(items.count - Self.cap)
         }
