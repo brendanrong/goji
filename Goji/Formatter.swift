@@ -166,10 +166,30 @@ enum TranscriptFormatter {
         "were", "now", "online", "available", "only", "just", "free", "today", "site", "page", "link", "app",
     ]
 
+    /// File extensions: "readme dot md" -> "readme.md". The name keeps its case
+    /// (file names are case-sensitive), the extension is lowercased.
+    private static let fileExtensions = "md|txt|swift|js|ts|tsx|jsx|json|py|rb|go|rs|java|kt|cpp|c|h|css|scss|html|yml|yaml|toml|xml|sh|zsh|pdf|png|jpg|jpeg|gif|svg|csv|tsv|xlsx|docx|pptx|zip|log|sql|plist|lock|mp3|mp4|mov|wav"
+    private static let fileLabel = #"[A-Za-z0-9_][A-Za-z0-9_-]*"#
+    private static let fileName = regex(
+        #"(?<![\w'@.-])("# + fileLabel + #"(?:"# + dotSep + fileLabel + #")*)"# + dotSep + #"("# + fileExtensions + #")(?![\w-])"#
+    )
+    private static let dotFileMark = "\u{2024}"
+    /// "dot env" -> ".env".
+    private static let dotFile = regex(#"(?<![\w'.])dot\s+(env|gitignore|zshrc|bashrc|npmrc|gitconfig)(?![\w-])"#)
+
     private static func applyWebAddresses(_ text: String) -> String {
         var s = replacing(address, in: text) { ns, match in
             let raw = ns.substring(with: match.range)
             return dotSepRegex.stringByReplacingMatches(in: raw, range: full(raw), withTemplate: ".").lowercased()
+        }
+        s = replacing(fileName, in: s) { ns, match in
+            let rawName = ns.substring(with: match.range(at: 1))
+            let name = dotSepRegex.stringByReplacingMatches(in: rawName, range: full(rawName), withTemplate: ".")
+            return name + "." + ns.substring(with: match.range(at: 2)).lowercased()
+        }
+        s = replacing(dotFile, in: s) { ns, match in
+            // Placeholder dot so tidy doesn't glue it to the word before.
+            dotFileMark + ns.substring(with: match.range(at: 1)).lowercased()
         }
         s = replacing(email, in: s) { ns, match in
             let rawLocal = ns.substring(with: match.range(at: 1))
@@ -277,7 +297,7 @@ enum TranscriptFormatter {
     private static let commaThenStop = regex(#",\s*([.!?])"#)
     private static let multiSpace = regex(#"[ \t]{2,}"#)
     private static let spaceAroundBreak = regex(#"[ \t]*\n[ \t]*"#)
-    private static let addressStart = regex(#"[\w-]+(?:[.@][\w-]+)*\.(?:"# + tlds + #")(?![\w-])"#)
+    private static let addressStart = regex(#"[\w-]+(?:[.@][\w-]+)*\.(?:"# + tlds + "|" + fileExtensions + #")(?![\w-])"#)
     private static let lowercaseSentenceStart = regex(#"(^|[.!?]\s+|\n)(\p{Ll})"#)
 
     private static func tidy(_ text: String) -> String {
@@ -307,6 +327,7 @@ enum TranscriptFormatter {
         return (ns as String)
             .replacingOccurrences(of: openQuote, with: "\"")
             .replacingOccurrences(of: closeQuote, with: "\"")
+            .replacingOccurrences(of: dotFileMark, with: ".")
     }
 
     // MARK: Helpers

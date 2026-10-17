@@ -146,6 +146,16 @@ let cases: [Case] = [
     Case("She wore a polka dot dress", "She wore a polka dot dress", punctOnly),
     Case("We met at the office.", "We met at the office.", punctOnly),
     Case("bolt dot new is great", "bolt.new is great"),
+
+    // File names
+    Case("Open readme dot md", "Open readme.md", punctOnly),
+    Case("Check package dot JSON", "Check package.json", punctOnly),
+    Case("Edit README dot md", "Edit README.md", punctOnly),
+    Case("Run index dot test dot ts", "Run index.test.ts", punctOnly),
+    Case("Open Formatter. Dot. Swift.", "Open Formatter.swift.", punctOnly),
+    Case("Add it to the dot env file", "Add it to the .env file", punctOnly),
+    Case("readme dot md has it", "readme.md has it"),
+    Case("A dot on the map", "A dot on the map", punctOnly),
     Case("Done. brendan at canva dot com has it", "Done. brendan@canva.com has it"),
     Case("Done. so we ship", "Done. So we ship"),
     Case("Wait dot dot dot what", "Wait\u{2026} what", punctOnly),
