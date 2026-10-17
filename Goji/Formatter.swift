@@ -426,34 +426,68 @@ enum NumberWords {
     /// Years and clock times. Skipped when a unit follows ("twenty thirty
     /// minutes", "three fifty dollars"): those are amounts, not dates or times.
     private static func joinYearsAndTimes(_ text: String) -> String {
-        var s = replaceMatches(year, in: text) { ns, m in
+        func isAmount(_ next: String?) -> Bool {
+            guard let next else { return false }
+            return unitsAfter.contains(next) && next != "am" && next != "pm"
+        }
+        var s = replaceMatches(year, in: text) { ns, m, next in
+            if isAmount(next) { return nil }
             let century = smallValue(ns.substring(with: m.range(at: 1)))
             return String(century * 100 + smallValue(ns.substring(with: m.range(at: 2))))
         }
-        s = replaceMatches(time, in: s) { ns, m in
+        s = replaceMatches(time, in: s) { ns, m, next in
             let hour = smallValue(ns.substring(with: m.range(at: 1)))
             let minutes = smallValue(ns.substring(with: m.range(at: 2)))
-            return "\(hour):" + (minutes < 10 ? "0" : "") + String(minutes)
+            let mm = (minutes < 10 ? "0" : "") + String(minutes)
+            // "three fifty dollars" is a price: 3.50, which the money pass turns into $3.50.
+            if let next, money.contains(next) { return "\(hour).\(mm)" }
+            if isAmount(next) { return nil }
+            return "\(hour):\(mm)"
         }
         return s
     }
 
-    private static func replaceMatches(_ re: NSRegularExpression, in text: String, _ transform: (NSString, NSTextCheckingResult) -> String) -> String {
+    /// Replace each match with `transform`'s result (given the lowercased word
+    /// after the match); nil leaves the match as is.
+    private static func replaceMatches(_ re: NSRegularExpression, in text: String, _ transform: (NSString, NSTextCheckingResult, String?) -> String?) -> String {
         let ns = text as NSString
         var out = ""
         var cursor = 0
         for m in re.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
             let end = m.range.location + m.range.length
-            let rest = ns.substring(from: end)
-            if let next = nextWord.firstMatch(in: rest, range: NSRange(location: 0, length: (rest as NSString).length)),
-               unitsAfter.contains((rest as NSString).substring(with: next.range(at: 1)).lowercased()),
-               !["am", "pm"].contains((rest as NSString).substring(with: next.range(at: 1)).lowercased()) {
-                continue
-            }
-            out += ns.substring(with: NSRange(location: cursor, length: m.range.location - cursor)) + transform(ns, m)
+            let rest = ns.substring(from: end) as NSString
+            let next = nextWord.firstMatch(in: rest as String, range: NSRange(location: 0, length: rest.length))
+                .map { rest.substring(with: $0.range(at: 1)).lowercased() }
+            guard let replacement = transform(ns, m, next) else { continue }
+            out += ns.substring(with: NSRange(location: cursor, length: m.range.location - cursor)) + replacement
             cursor = end
         }
         return out + ns.substring(from: cursor)
+    }
+
+    // MARK: Money and percent
+
+    private static let money: Set<String> = ["dollar", "dollars", "bucks"]
+    /// "5 dollars" -> "$5", "5 dollars and 50 cents" -> "$5.50", "3.50 dollars" -> "$3.50".
+    private static let dollars = try! NSRegularExpression(
+        pattern: #"(?<![\w$.])(\d+(?:\.\d+)?) (?:dollars?|bucks)(?: (?:and )?(\d{1,2}) cents?)?(?![\w'])"#,
+        options: [.caseInsensitive]
+    )
+    /// "5 percent" -> "5%".
+    private static let percent = try! NSRegularExpression(
+        pattern: #"(?<![\w.])(\d+(?:\.\d+)?) (?:percent|per cent)(?![\w'])"#,
+        options: [.caseInsensitive]
+    )
+
+    private static func applyMoneyAndPercent(_ text: String) -> String {
+        var s = replaceMatches(dollars, in: text) { ns, m, _ in
+            let amount = ns.substring(with: m.range(at: 1))
+            guard m.range(at: 2).location != NSNotFound else { return "$" + amount }
+            let cents = ns.substring(with: m.range(at: 2))
+            return "$" + amount + "." + (cents.count == 1 ? "0" : "") + cents
+        }
+        s = percent.stringByReplacingMatches(in: s, range: NSRange(location: 0, length: (s as NSString).length), withTemplate: "$1%")
+        return s
     }
 
     static func normalize(_ input: String) -> String {
@@ -472,7 +506,8 @@ enum NumberWords {
             }
         }
         // "Q 3" -> "Q3", "v 2" -> "v2".
-        return letterNumber.stringByReplacingMatches(in: out, range: NSRange(out.startIndex..., in: out), withTemplate: "$1$2")
+        out = letterNumber.stringByReplacingMatches(in: out, range: NSRange(out.startIndex..., in: out), withTemplate: "$1$2")
+        return applyMoneyAndPercent(out)
     }
 
     /// Try to read a number starting at tokens[start]. Returns how many tokens

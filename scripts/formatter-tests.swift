@@ -66,7 +66,7 @@ let cases: [Case] = [
 
     // Numbers
     Case("I can pull up eighty kilos.", "I can pull up 80 kilos.", numbersOnly),
-    Case("It costs a hundred dollars to enter.", "It costs 100 dollars to enter.", numbersOnly),
+    Case("It costs a hundred dollars to enter.", "It costs $100 to enter.", numbersOnly),
     Case("Fable Five Point One wins.", "Fable 5.1 wins.", numbersOnly),
     Case("A fifteen-year-old question.", "A 15-year-old question.", numbersOnly),
     Case("The fifteenth thingy.", "The 15th thingy.", numbersOnly),
@@ -77,12 +77,12 @@ let cases: [Case] = [
     Case("One thing, two things, nine things.", "One thing, two things, nine things.", numbersOnly),
     Case("First, we ship. Second, we test.", "First, we ship. Second, we test.", numbersOnly),
     Case("Call zero zero seven.", "Call zero zero seven.", numbersOnly),
-    Case("A hundred percent.", "100 percent.", numbersOnly),
+    Case("A hundred percent.", "100%.", numbersOnly),
     Case("Ten and a half.", "10 and a half.", numbersOnly),
     Case("So GPT six is out.", "So GPT 6 is out.", numbersOnly),
     Case("Q three results and iOS nine.", "Q3 results and iOS 9.", numbersOnly),
     Case("Do step three, then version two.", "Do step 3, then version 2.", numbersOnly),
-    Case("Eight kilos, five percent, three pm.", "8 kilos, 5 percent, 3 pm.", numbersOnly),
+    Case("Eight kilos, five percent, three pm.", "8 kilos, 5%, 3 pm.", numbersOnly),
     Case("I have two dogs and one cat.", "I have two dogs and one cat.", numbersOnly),
     Case("I mean, three of them.", "I mean, three of them.", numbersOnly),
 
@@ -106,7 +106,16 @@ let cases: [Case] = [
     Case("From ten fifteen to eleven forty five", "From 10:15 to 11:45"),
     Case("Wake at six oh five am", "Wake at 6:05 am"),
     Case("It was twenty thirty minutes", "It was 20 30 minutes", numbersOnly),
-    Case("It costs three fifty dollars", "It costs three 50 dollars", numbersOnly),
+    Case("It costs three fifty dollars", "It costs $3.50", numbersOnly),
+
+    // Money and percent
+    Case("It costs five dollars", "It costs $5", numbersOnly),
+    Case("Twenty bucks each", "$20 each", numbersOnly),
+    Case("Five dollars and fifty cents", "$5.50", numbersOnly),
+    Case("Up twelve point five percent", "Up 12.5%", numbersOnly),
+    Case("Up 15 per cent", "Up 15%", numbersOnly),
+    Case("How many dollars is it?", "How many dollars is it?", numbersOnly),
+    Case("Fifty cents", "50 cents", numbersOnly),
     Case("Thirty three people", "33 people", numbersOnly),
     Case("One hundred and twenty three", "123", numbersOnly),
 
